@@ -1,0 +1,58 @@
+name: release
+
+# Tag a version and this workflow builds the tarball DSH installs, then
+# publishes it as a release asset:
+#
+#   git tag v0.3.1-alpha.1
+#   git push origin v0.3.1-alpha.1
+#
+# The resulting URL is
+#   https://github.com/<owner>/dsh-projects/releases/download/v<version>/dsh-projects-<version>.tgz
+#
+# which DSH accepts directly in the plugin manager ("install from URL") or with
+#   dsh plugin --profile <name> add <url>
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - name: Pack
+        id: pack
+        run: |
+          file="$(npm pack --silent)"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FILE: ${{ steps.pack.outputs.file }}
+          VERSION: ${{ steps.pack.outputs.version }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [[ -n "${{ inputs.tag }}" ]]; then tag="${{ inputs.tag }}"; fi
+          gh release create "$tag" "$FILE" \
+            --title "dsh-projects $VERSION" \
+            --notes "Tarball asset for \`dsh plugin add\`: $FILE"

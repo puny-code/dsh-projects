@@ -1757,7 +1757,10 @@
       );
     }
 
-    const inject = ["slots", "locale", "sessions", "workspaces", "connection"];
+    // DSH 0.2.x keeps the data services (`workspaces`, `sessions`) but moved the
+    // UI-level workspace actions onto `uiWorkspace`; inject both so one bundle
+    // serves 0.1.x and 0.2.x.
+    const inject = ["slots", "locale", "sessions", "workspaces", "uiWorkspace", "connection"];
     const name = "dsh-projects";
 
     function apply(ctx) {
@@ -1765,8 +1768,34 @@
       ctx.effect(installProjectCopyBridge, "dsh-projects: project copy bridge");
       ctx.effect(() => ctx.locale.register(NS, dictionaries), "dsh-projects: dictionaries");
 
+      /**
+       * DSH 0.2.x moved `pickDirectory`, `listDirectory`, `startSession`, and
+       * `openSession` from `ctx.workspaces` / `ctx.sessions` onto the
+       * `uiWorkspace` service. Fall back to the 0.1.x locations so the same
+       * bundle keeps working on both lines.
+       */
+      const uiWorkspace = () => ctx.uiWorkspace || ctx.workspaces;
+
+      /** Open a path in the host file manager; 0.2.x has no service for it. */
+      const openPath = async (path) => {
+        if (typeof ctx.workspaces?.openPath === "function") return ctx.workspaces.openPath(path);
+        if (ctx.connection?.isLoopback && ctx.connection?.rpc?.call) {
+          try {
+            const result = await ctx.connection.rpc.call("/dsh-projects", "openPath", { path });
+            if (result?.ok) return result.value;
+          } catch (reason) {
+            console.warn("[dsh-projects] host openPath bridge unavailable", reason);
+          }
+        }
+        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(path);
+          return { copied: true, path };
+        }
+        throw new Error("dsh-projects: opening a path is unavailable here");
+      };
+
       const defaultWorkspace = createDefaultWorkspaceManager({
-        workspaces: ctx.workspaces,
+        workspaces: uiWorkspace(),
         storage: localStorage
       });
       const startDefaultSession = async () => {
@@ -1784,7 +1813,7 @@
           cwd = await defaultWorkspace.allocateSessionRoot();
         }
         const workspace = await ctx.workspaces.create({ path: cwd });
-        ctx.workspaces.startSession(workspace.workspaceId);
+        uiWorkspace().startSession(workspace.workspaceId);
         return workspace.workspaceId;
       };
       const isDefaultWorkspace = (workspace) => defaultWorkspace.isDefaultWorkspace(workspace);
@@ -1806,7 +1835,7 @@
         const selected = await pickProjectDirectory({
           desktopPicker,
           legacyPicker,
-          workspacePicker: () => ctx.workspaces.pickDirectory(),
+          workspacePicker: () => uiWorkspace().pickDirectory(),
           onFallback: (source, reason) => console.warn(`[dsh-projects] ${source} directory picker unavailable; falling back`, reason)
         });
         rememberPickerParent(selected);
@@ -1817,9 +1846,9 @@
         createWorkspace: (input) => ctx.workspaces.create(input),
         renameWorkspace: (workspaceId, title) => ctx.workspaces.rename(workspaceId, title),
         pickDirectory,
-        listDirectory: (path, signal) => ctx.workspaces.listDirectory(path, signal),
-        openSession: (sessionId) => ctx.sessions.open(sessionId),
-        startSession: (workspaceId) => ctx.workspaces.startSession(workspaceId),
+        listDirectory: (path, signal) => uiWorkspace().listDirectory(path, signal),
+        openSession: (sessionId) => uiWorkspace().openSession(sessionId),
+        startSession: (workspaceId) => uiWorkspace().startSession(workspaceId),
         startDefaultSession,
         isDefaultWorkspace,
         deleteWorkspace: (workspaceId) => ctx.workspaces.delete(workspaceId),
@@ -1829,7 +1858,7 @@
           ? (sessionId) => ctx.workspaces.unarchiveSession(sessionId)
           : null,
         insertSessionBefore: (workspaceId, sessionId, beforeSessionId) => ctx.workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId),
-        openPath: (path) => ctx.workspaces.openPath(path),
+        openPath: (path) => openPath(path),
         searchSessions: async (query, signal) => {
           const result = await ctx.sessions.search(query, signal);
           if (!result.ok) throw new Error(result.error.message);

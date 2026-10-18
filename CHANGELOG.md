@@ -4,6 +4,17 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+## 0.3.1-alpha.1 - 2026-10-18
+
+- Support the DSH 0.2.x runtime line, verified against DSH 0.2.1-rc.2: the eight `@deepseek-ai/dsh-*` peer ranges now accept `0.1.0-rc.6` through the published `0.2.x` previews, so the plugin installs instead of being rejected as incompatible.
+- Move the Host native bridge onto the supported 0.2.x surface: `ctx.webServer.register()` with `ctx.connection.admit()` authentication. DSH 0.2.x made `ctx.connection.rpc.handle()` unusable from a profile plugin — its internal registration resolves the owning Context to one that cannot see `webServer`, so registration threw `cannot get property "webServer" without inject` no matter what the plugin declared.
+- Keep the 0.1.x channel registration as a fallback for older runtimes, detected at runtime.
+- Refuse to mount the native bridge when the deployment allows remote authorities, because 0.2.x removed the per-channel `authority: "loopback"` guard and a remote browser must not be able to open host dialogs or create host directories.
+- Migrate the browser half to the 0.2.x `uiWorkspace` service for `pickDirectory`, `listDirectory`, `startSession` and `openSession`, keeping `ctx.workspaces` / `ctx.sessions` as fallbacks for 0.1.x.
+- Restore "open in file manager" on 0.2.x, where `ctx.workspaces.openPath` was removed: the Host bridge now reveals the path through Electron's shell or the platform opener, and degrades to copying the path to the clipboard.
+- Refresh `dsh.client.inject` to the 0.2.x client module names.
+- Verified on DSH 0.2.1-rc.2: isolated profile boot with no activation warnings, plugin sidebar renders real Workspaces, create-project dialog renders, and the Host bridge round-trips `allocateDefaultWorkspace` over an authenticated browser session (401 without the browser session, 200 with it).
+
 ## 0.3.0-alpha.2 - 2026-08-27
 
 - Prefer DSH Desktop's official Windows directory-picker bridge when available, while retaining the plugin Host bridge and stock Workspace picker as compatibility fallbacks.

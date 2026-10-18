@@ -24,11 +24,31 @@ jobs:
       - run: npm run verify
       - run: npm pack --dry-run
 
+  dsh-compat:
+    name: DSH ${{ matrix.dsh }} contract
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Every runtime line the plugin claims. DSH itself compares its own
+        # version with these peer ranges before installing, so this is the
+        # exact gate that used to reject the plugin on 0.2.x.
+        dsh: [0.1.0-rc.6, 0.1.1-rc.2, 0.2.0-rc.2, 0.2.1-rc.1, 0.2.1-rc.2]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/check-dsh-compat.mjs ${{ matrix.dsh }}
+
   dsh-peer-lines:
     name: DSH ${{ matrix.dsh }} peers
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        # Resolvable 0.1.x lines: install the real packages and assert the
+        # resolved versions, not just the declared ranges.
         dsh: [0.1.0-rc.6, 0.1.1-rc.2]
     steps:
       - uses: actions/checkout@v7

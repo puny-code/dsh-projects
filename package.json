@@ -1,6 +1,6 @@
 {
   "name": "dsh-projects",
-  "version": "0.3.0-alpha.2",
+  "version": "0.3.1-alpha.1",
   "description": "Project and session management, searchable sessions, native folder picking, and sidebar organization for DeepSeek Harness.",
   "type": "module",
   "main": "./src/index.js",
@@ -26,14 +26,16 @@
     "docs/assets/picker.webp",
     "docs/assets/create.webp",
     "docs/assets/native.webp",
-    "LICENSE"
+    "LICENSE",
+    "scripts/check-dsh-compat.mjs"
   ],
   "scripts": {
     "build": "node build.mjs",
     "check": "node --check src/client.cjs && node --check src/index.js && node --check src/default-workspace-host.js && node --check src/native-bridge.js && node --check src/core/default-workspace.cjs && node --check src/core/directory-picker-strategy.cjs && node --check src/core/native-picker-result.cjs && node --check src/core/picker-history.cjs && node --check src/core/project-groups.cjs && node --check src/core/session-state.cjs",
     "test": "node --test",
-    "verify": "npm run check && npm run build && npm test",
-    "prepack": "npm run verify"
+    "verify": "npm run check && npm run check:compat && npm run build && npm test",
+    "prepack": "npm run verify",
+    "check:compat": "node scripts/check-dsh-compat.mjs 0.1.0-rc.6 0.1.1-rc.2 0.2.0-rc.2 0.2.1-rc.1 0.2.1-rc.2"
   },
   "engines": {
     "node": ">=20"
@@ -45,7 +47,9 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-controller",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-conversation",
@@ -70,14 +74,14 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-client-connection": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2",
-    "@deepseek-ai/dsh-client-ui-workspace": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2",
-    "@deepseek-ai/dsh-host-directory-picker-native": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2",
+    "@deepseek-ai/dsh-client-connection": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-workspace": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2 || >=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-host-directory-picker-native": "0.1.0-rc.6 || 0.1.0-rc.7 || 0.1.0-rc.8 || 0.1.1-rc.1 || 0.1.1-rc.2 || >=0.2.0-rc.1 <0.3.0-0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
