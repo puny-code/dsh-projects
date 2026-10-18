@@ -41,18 +41,31 @@ jobs:
       - run: npm run verify
       - name: Pack
         id: pack
+        # --ignore-scripts keeps prepack's verify output out of the captured
+        # file name; verify already ran in the previous step.
         run: |
-          file="$(npm pack --silent)"
+          set -euo pipefail
+          file="$(npm pack --ignore-scripts --silent | tail -n1)"
+          if [ -z "$file" ] || [ ! -f "$file" ]; then
+            file="$(ls -1t ./*.tgz | head -n1)"
+          fi
           echo "file=$file" >> "$GITHUB_OUTPUT"
           echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Checksums
+        run: sha256sum ./*.tgz > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FILE: ${{ steps.pack.outputs.file }}
           VERSION: ${{ steps.pack.outputs.version }}
         run: |
-          tag="${GITHUB_REF_NAME}"
-          if [[ -n "${{ inputs.tag }}" ]]; then tag="${{ inputs.tag }}"; fi
-          gh release create "$tag" "$FILE" \
-            --title "dsh-projects $VERSION" \
-            --notes "Tarball asset for \`dsh plugin add\`: $FILE"
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          if [ -n "${{ inputs.tag }}" ]; then tag="${{ inputs.tag }}"; fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "$FILE" SHA256SUMS.txt --clobber
+          else
+            gh release create "$tag" "$FILE" SHA256SUMS.txt \
+              --title "dsh-projects $VERSION" \
+              --notes "Tarball asset for \`dsh plugin add\`: $FILE"
+          fi
