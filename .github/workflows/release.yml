@@ -69,3 +69,6 @@ jobs:
               --title "dsh-projects $VERSION" \
               --notes "Tarball asset for \`dsh plugin add\`: $FILE"
           fi
+          # A release whose tag was re-created can come back as a draft; drafts
+          # are invisible to unauthenticated downloads, so always publish.
+          gh release edit "$tag" --draft=false
