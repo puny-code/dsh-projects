@@ -411,6 +411,19 @@ var dictionaries = {
     editProject: "\u7F16\u8F91\u9879\u76EE",
     archiveChats: "\u5F52\u6863\u804A\u5929",
     archiveChat: "\u5F52\u6863\u804A\u5929",
+    sessionActions: "\u4F1A\u8BDD\u64CD\u4F5C",
+    renameSession: "\u91CD\u547D\u540D",
+    renameSessionTitle: "\u91CD\u547D\u540D\u4F1A\u8BDD",
+    sessionName: "\u4F1A\u8BDD\u540D\u79F0",
+    forkSession: "\u5206\u53C9\u4F1A\u8BDD",
+    copySessionId: "\u590D\u5236 Session ID",
+    sessionIdCopied: "Session ID \u5DF2\u590D\u5236",
+    sessionIdCopyFailed: "\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5",
+    forkRequiresOpen: "\u8BF7\u5148\u6253\u5F00\u539F\u4F1A\u8BDD\u5B8C\u6210\u8FC1\u79FB\uFF0C\u518D\u521B\u5EFA\u5206\u652F\u3002",
+    renameInvalid: "\u4F1A\u8BDD\u540D\u79F0\u65E0\u6548\u3002",
+    apiUnavailable: "\u5F53\u524D DSH \u7248\u672C\u6CA1\u6709\u63D0\u4F9B\u8FD9\u4E2A\u64CD\u4F5C\u3002",
+    sessionBusy: "\u8BE5\u4F1A\u8BDD\u6B63\u88AB\u5360\u7528\uFF08\u53EF\u80FD\u6B63\u5728\u8FD0\u884C\uFF09\uFF0C\u8BF7\u7B49\u5B83\u7A7A\u95F2\u540E\u518D\u8BD5\u3002",
+    operationFailed: "\u64CD\u4F5C\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002",
     removeProject: "\u79FB\u9664\u672C\u5730\u9879\u76EE",
     editProjectTitle: "\u7F16\u8F91\u9879\u76EE",
     save: "\u4FDD\u5B58",
@@ -524,6 +537,19 @@ var dictionaries = {
     editProject: "Edit project",
     archiveChats: "Archive chats",
     archiveChat: "Archive chat",
+    sessionActions: "Session actions",
+    renameSession: "Rename",
+    renameSessionTitle: "Rename chat",
+    sessionName: "Chat name",
+    forkSession: "Fork chat",
+    copySessionId: "Copy session ID",
+    sessionIdCopied: "Session ID copied",
+    sessionIdCopyFailed: "Copy failed, please retry",
+    forkRequiresOpen: "Open the source chat once to finish its migration, then fork it.",
+    renameInvalid: "That chat name is not valid.",
+    apiUnavailable: "This DSH version does not expose that action.",
+    sessionBusy: "That chat is busy right now (it may be running) - try again once it is idle.",
+    operationFailed: "Action failed, please retry.",
     removeProject: "Remove local project",
     editProjectTitle: "Edit project",
     save: "Save",
@@ -664,16 +690,17 @@ var css = `
       .dshp-section-head .dshp-section-title{padding:0;flex:1;height:auto}
       .dshp-section-actions{display:flex;align-items:center;gap:1px}
       .dshp-mini-button{width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--dshp-text-3);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background-color 100ms ease,color 100ms ease}
-      .dshp-mini-button:hover,.dshp-mini-button[data-active=true]{background:var(--dshp-hover);color:var(--dshp-text)}
+      .dshp-mini-button:hover,.dshp-mini-button[data-active=true],.dshp-mini-button[data-menu-open=true]{background:var(--dshp-hover);color:var(--dshp-text)}
       .dshp-project-row,.dshp-session-wrap{box-sizing:border-box;width:100%;position:relative}
       .dshp-project-row[data-drag-over=before],.dshp-session-wrap[data-drag-over=before]{box-shadow:inset 0 2px var(--dsw-alias-state-business-primary,#78a7f5)}
       .dshp-project-row[data-drag-over=after],.dshp-session-wrap[data-drag-over=after]{box-shadow:inset 0 -2px var(--dsw-alias-state-business-primary,#78a7f5)}
       .dshp-project-actions,.dshp-session-actions{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:none;align-items:center;gap:1px}
-      .dshp-project-row:hover .dshp-project-actions,.dshp-project-row[data-menu-open=true] .dshp-project-actions,.dshp-session-wrap:hover .dshp-session-actions,.dshp-session-wrap[data-pinned=true] .dshp-session-actions{display:flex}
+      .dshp-project-row:hover .dshp-project-actions,.dshp-project-row[data-menu-open=true] .dshp-project-actions,.dshp-session-wrap:hover .dshp-session-actions,.dshp-session-wrap[data-pinned=true] .dshp-session-actions,.dshp-session-wrap[data-menu-open=true] .dshp-session-actions{display:flex}
       .dshp-sidebar-project,.dshp-sidebar-session{padding-right:10px}
-      .dshp-project-row:hover .dshp-sidebar-project,.dshp-project-row[data-menu-open=true] .dshp-sidebar-project,.dshp-session-wrap:hover .dshp-sidebar-session{padding-right:68px}
+      .dshp-project-row:hover .dshp-sidebar-project,.dshp-project-row[data-menu-open=true] .dshp-sidebar-project{padding-right:68px}
+      .dshp-session-wrap:hover .dshp-sidebar-session,.dshp-session-wrap[data-menu-open=true] .dshp-sidebar-session{padding-right:96px}
       .dshp-session-wrap[data-pinned=true]:not(:hover) .dshp-sidebar-session{padding-right:38px}
-      .dshp-session-wrap[data-pinned=true]:not(:hover) .dshp-session-actions .dshp-mini-button:last-child{display:none}
+      .dshp-session-wrap[data-pinned=true]:not(:hover) .dshp-session-actions .dshp-mini-button:not(:first-child){display:none}
       .dshp-context{position:fixed;z-index:10030;width:250px;border:1px solid var(--dshp-border);border-radius:13px;background:var(--dshp-elevated);box-shadow:var(--dsw-shadow-lv3,0 12px 32px rgba(0,0,0,.16));padding:7px}
       .dshp-context-label{padding:6px 10px 5px;color:var(--dshp-text-3);font-size:12px;font-weight:600}
       .dshp-context-separator{height:1px;background:var(--dshp-border);margin:5px 4px}
@@ -718,6 +745,7 @@ var css = `
       .dshp-dir-hidden{display:flex;align-items:center;gap:7px;color:var(--dshp-text-3);font-size:12px;cursor:pointer;user-select:none}
       .dshp-dir-path{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dshp-text-3);font-size:11.5px;margin-top:8px}
       .dshp-action-error{padding:7px 8px;color:var(--dsw-alias-state-error-primary,#ff8a80);font-size:11px;line-height:16px}
+      .dshp-action-note{padding:7px 8px;color:var(--dsw-alias-state-business-primary,#78a7f5);font-size:11px;line-height:16px}
       .dshp-flat-project{margin-left:8px;color:var(--dshp-text-3);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .dshp-sidebar[data-dragging=true] *{cursor:grabbing!important}
       .dshp-sidebar-search{margin:0 4px 7px;height:34px;border:1px solid var(--dshp-border);border-radius:9px;background:var(--dshp-input);display:flex;align-items:center;gap:7px;padding:0 8px;color:var(--dshp-text-3)}
@@ -813,7 +841,9 @@ function Icon({ name: name2, size = 18 }) {
     check: [h("path", { key: 1, d: "m5 12 4 4L19 6" })],
     list: [h("path", { key: 1, d: "M8 6h12M8 12h12M8 18h12" }), h("circle", { key: 2, cx: 4, cy: 6, r: 1 }), h("circle", { key: 3, cx: 4, cy: 12, r: 1 }), h("circle", { key: 4, cx: 4, cy: 18, r: 1 })],
     chat: [h("path", { key: 1, d: "M4 4h16v12H8l-4 4z" })],
-    restore: [h("path", { key: 1, d: "M4 8v5h5" }), h("path", { key: 2, d: "M5.5 12A7 7 0 1 0 7 6.5L4 9" })]
+    restore: [h("path", { key: 1, d: "M4 8v5h5" }), h("path", { key: 2, d: "M5.5 12A7 7 0 1 0 7 6.5L4 9" })],
+    branch: [h("circle", { key: 1, cx: 6, cy: 6, r: 2.5 }), h("circle", { key: 2, cx: 18, cy: 6, r: 2.5 }), h("circle", { key: 3, cx: 6, cy: 18, r: 2.5 }), h("path", { key: 4, d: "M6 8.5v7" }), h("path", { key: 5, d: "M18 8.5c0 4.5-6 3-6 7" })],
+    copy: [h("rect", { key: 1, x: 9, y: 9, width: 11, height: 11, rx: 2 }), h("path", { key: 2, d: "M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15" })]
   };
   return h("svg", common, ...paths[name2] || paths.folder);
 }
@@ -821,6 +851,32 @@ function format(t, key, vars = {}) {
   let text = t(key);
   for (const [name2, value] of Object.entries(vars)) text = text.replace(`{${name2}}`, String(value));
   return text;
+}
+async function copyText(value) {
+  const text = String(value ?? "");
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (reason) {
+  }
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.top = "-1000px";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    area.setSelectionRange(0, area.value.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(area);
+    return Boolean(ok);
+  } catch (reason) {
+    return false;
+  }
 }
 function normalizedPath(value) {
   return String(value || "").replace(/[\\/]+$/, "").toLowerCase();
@@ -1677,7 +1733,71 @@ function ConfirmModal({ request, busy, error, onConfirm, onClose, t }) {
     document.body
   );
 }
-function SessionRow({ session, project, current, pinned, draggable, dragOver, onOpen, onTogglePin, onArchive, onDragStart, onDragOver, onDrop, onDragEnd, t }) {
+function RenameSessionModal({ session, renameSession, onClose, t }) {
+  const initial = session ? String(session.displayTitle || session.title || "") : "";
+  const [value, setValue] = React.useState(initial);
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const inputRef = React.useRef(null);
+  React.useEffect(() => {
+    setValue(initial);
+    setError("");
+    if (session) setTimeout(() => inputRef.current?.focus(), 20);
+  }, [session?.id]);
+  if (!session) return null;
+  const trimmed = value.trim();
+  const save = async () => {
+    if (!trimmed || trimmed === initial || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await renameSession(session.id, trimmed);
+      onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return ReactDOM.createPortal(
+    h(
+      "div",
+      { className: "dshp-backdrop", onMouseDown: (event) => {
+        if (event.target === event.currentTarget && !busy) onClose();
+      } },
+      h(
+        "section",
+        { className: "dshp-modal dshp-small-modal", role: "dialog", "aria-modal": true },
+        h(
+          "div",
+          { className: "dshp-modal-head" },
+          h("h2", { className: "dshp-modal-title" }, t("renameSessionTitle")),
+          h("button", { type: "button", className: "dshp-icon-button", onClick: onClose }, h(Icon, { name: "close", size: 19 }))
+        ),
+        h(
+          "div",
+          { className: "dshp-name-field" },
+          h("div", { className: "dshp-name-icon" }, h(Icon, { name: "chat", size: 18 })),
+          h("input", { ref: inputRef, value, maxLength: 120, placeholder: t("sessionName"), onChange: (event) => {
+            setValue(event.target.value);
+            setError("");
+          }, onKeyDown: (event) => {
+            if (event.key === "Enter") save();
+          } })
+        ),
+        h("div", { className: "dshp-error" }, error),
+        h(
+          "div",
+          { className: "dshp-modal-actions" },
+          h("button", { type: "button", className: "dshp-button", disabled: busy, onClick: onClose }, t("cancel")),
+          h("button", { type: "button", className: "dshp-button dshp-button-primary", disabled: busy || !trimmed || trimmed === initial, onClick: save }, t("save"))
+        )
+      )
+    ),
+    document.body
+  );
+}
+function SessionRow({ session, project, current, pinned, draggable, dragOver, menuOpen, onOpen, onTogglePin, onArchive, onMenu, onDragStart, onDragOver, onDrop, onDragEnd, t }) {
   const hover = useHoverPreview();
   const title = sessionTitle(session, t);
   const state = sessionStateKind(session);
@@ -1689,6 +1809,13 @@ function SessionRow({ session, project, current, pinned, draggable, dragOver, on
       className: "dshp-session-wrap",
       "data-drag-over": dragOver || void 0,
       "data-pinned": pinned ? "true" : "false",
+      "data-menu-open": menuOpen ? "true" : "false",
+      onContextMenu: (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        hover.leave();
+        onMenu(event, session);
+      },
       onPointerEnter: hover.enter,
       onPointerLeave: hover.leave,
       draggable,
@@ -1716,7 +1843,12 @@ function SessionRow({ session, project, current, pinned, draggable, dragOver, on
         event.stopPropagation();
         hover.leave();
         onArchive(session.id);
-      } }, h(Icon, { name: "archive", size: 15 }))
+      } }, h(Icon, { name: "archive", size: 15 })),
+      h("button", { type: "button", className: "dshp-mini-button", "data-menu-open": menuOpen ? "true" : "false", title: t("sessionActions"), "aria-label": t("sessionActions"), onClick: (event) => {
+        event.stopPropagation();
+        hover.leave();
+        onMenu(event, session);
+      } }, h(Icon, { name: "ellipsis", size: 17 }))
     ),
     h(
       PreviewPortal,
@@ -1964,7 +2096,7 @@ function ArchiveCenterModal({ open, archivedIds, projects, sessionState, restore
     document.body
   );
 }
-function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, openSession, startSession, startDefaultSession, isDefaultWorkspace, createWorkspace, renameWorkspace, pickDirectory, listDirectory, deleteWorkspace, insertWorkspaceBefore, archiveSession, restoreSession, insertSessionBefore, openPath, searchSessions, searchResultLimit, t }) {
+function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, openSession, startSession, startDefaultSession, isDefaultWorkspace, createWorkspace, renameWorkspace, pickDirectory, listDirectory, deleteWorkspace, insertWorkspaceBefore, archiveSession, restoreSession, insertSessionBefore, openPath, searchSessions, searchResultLimit, renameSession, forkSession, t }) {
   const workspaceState = useWorkspaces((state) => state);
   const sessionState = useSessions((state) => state);
   const [prefs, setPrefs] = useSidebarPrefs();
@@ -1976,6 +2108,8 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
   const [confirmBusy, setConfirmBusy] = React.useState(false);
   const [confirmError, setConfirmError] = React.useState("");
   const [actionError, setActionError] = React.useState("");
+  const [actionNote, setActionNote] = React.useState("");
+  const [renameTarget, setRenameTarget] = React.useState(null);
   const [createOpen, setCreateOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -2095,6 +2229,39 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
   };
   const togglePref = (key, id) => setPrefs((current) => ({ ...current, [key]: toggleId(current[key], id) }));
   const archiveOne = (sessionId) => run(() => archiveSession(sessionId));
+  const note = (message) => {
+    setActionNote(message);
+    setTimeout(() => setActionNote(""), 3200);
+  };
+  const failureText = (result) => {
+    if (!result) return t("operationFailed");
+    if (result.code === "unavailable") return t("apiUnavailable");
+    if (result.code === "session/migration-required") return t("forkRequiresOpen");
+    if (result.code === "session/title-invalid") return t("renameInvalid");
+    if (result.code === "session/writer-held" || result.code === "session/already-owned") return t("sessionBusy");
+    if (typeof result.message === "string" && /already owned by an active write handle|write handle/i.test(result.message)) return t("sessionBusy");
+    return result.message || t("operationFailed");
+  };
+  const openSessionMenu = (event, session) => {
+    const width = 250;
+    const rect = event?.currentTarget?.getBoundingClientRect?.();
+    const fromPointer = event?.type === "contextmenu" && typeof event.clientX === "number" && event.clientX > 0;
+    const x = fromPointer ? event.clientX : rect ? rect.right + 6 : 12;
+    const y = fromPointer ? event.clientY : rect ? rect.bottom + 4 : 12;
+    setMenu({ kind: "session", target: session, left: Math.max(8, Math.min(x, window.innerWidth - width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - 320)) });
+  };
+  const renameOne = async (sessionId, title) => {
+    const result = await renameSession(sessionId, title);
+    if (!result || result.ok !== true) throw new Error(failureText(result));
+  };
+  const forkOne = (sessionId) => run(async () => {
+    const result = await forkSession(sessionId);
+    if (!result || result.ok !== true) throw new Error(failureText(result));
+  });
+  const copySessionId = (sessionId) => run(async () => {
+    const copied = await copyText(sessionId);
+    note(copied ? t("sessionIdCopied") : t("sessionIdCopyFailed"));
+  });
   const closeSearch = () => {
     setSearchOpen(false);
     setSearchQuery("");
@@ -2145,6 +2312,15 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
       setConfirm({ kind: "remove", project: selectedProject });
     } }
   ].filter(Boolean) : [];
+  const selectedSession = menu?.kind === "session" ? menu.target : null;
+  const sessionMenuItems = selectedSession ? [
+    { id: "pin-session", label: pinnedSessions.has(selectedSession.id) ? t("unpinChat") : t("pinChat"), icon: "pin", checked: pinnedSessions.has(selectedSession.id), onClick: () => togglePref("pinnedSessions", selectedSession.id) },
+    { id: "rename-session", label: t("renameSession"), icon: "edit", onClick: () => setRenameTarget(selectedSession) },
+    { id: "fork-session", label: t("forkSession"), icon: "branch", onClick: () => forkOne(selectedSession.id) },
+    { type: "separator", id: "session-sep" },
+    { id: "archive-session", label: t("archiveChat"), icon: "archive", onClick: () => archiveOne(selectedSession.id) },
+    { id: "copy-session-id", label: t("copySessionId"), icon: "copy", onClick: () => copySessionId(selectedSession.id) }
+  ] : [];
   const dragPropsForProject = (project) => ({
     draggable: prefs.orderBy === "manual" && !project.advancedGroup,
     dragOver: dragOver?.key === `project:${project.workspaceId}` ? dragOver.after ? "after" : "before" : null,
@@ -2218,9 +2394,11 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
     project: project ? { ...project, flatLabel: flat } : null,
     current: session.id === sessionState.current,
     pinned: pinnedSessions.has(session.id),
+    menuOpen: menu?.kind === "session" && menu.target?.id === session.id,
     onOpen: openSession,
     onTogglePin: (id) => togglePref("pinnedSessions", id),
     onArchive: archiveOne,
+    onMenu: openSessionMenu,
     t,
     ...dragPropsForSession(session, project?.workspaceId || "", flat)
   });
@@ -2273,6 +2451,7 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
           )
         ),
         actionError ? h("div", { className: "dshp-action-error" }, actionError) : null,
+        actionNote ? h("div", { className: "dshp-action-note" }, actionNote) : null,
         !searchOpen && prefs.attentionMode === "expanded" ? h(AttentionPanel, { sessions: uniqueFlat, projectForSession, onOpen: openSession, t }) : null,
         searchOpen ? h(
           React.Fragment,
@@ -2323,7 +2502,7 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
         ) : null
       )
     ),
-    h(ContextMenu, { menu, items: menu?.kind === "view" ? viewMenuItems : projectMenuItems, onClose: () => setMenu(null) }),
+    h(ContextMenu, { menu, items: menu?.kind === "view" ? viewMenuItems : menu?.kind === "session" ? sessionMenuItems : projectMenuItems, onClose: () => setMenu(null) }),
     h(CreateProjectModal, {
       open: createOpen,
       projects: allProjects,
@@ -2351,6 +2530,7 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
     h(ConfirmModal, { request: confirm, busy: confirmBusy, error: confirmError, onConfirm: confirmAction, onClose: () => {
       if (!confirmBusy) setConfirm(null);
     }, t }),
+    h(RenameSessionModal, { session: renameTarget, renameSession: renameOne, onClose: () => setRenameTarget(null), t }),
     h(ArchiveCenterModal, { open: archiveOpen, archivedIds: workspaceState.archivedSessionIds || [], projects, sessionState, restoreSession, onClose: () => setArchiveOpen(false), t })
   );
 }
@@ -2435,7 +2615,48 @@ function apply(ctx) {
       if (!result.ok) throw new Error(result.error.message);
       return result.value;
     },
-    searchResultLimit: ctx.sessions.searchResultLimit
+    searchResultLimit: ctx.sessions.searchResultLimit,
+    renameSession: async (sessionId, title) => {
+      const sessions = ctx.sessions;
+      if (!sessions) return { ok: false, code: "unavailable" };
+      try {
+        if (typeof sessions.rename === "function") {
+          const result = await sessions.rename(sessionId, title);
+          if (!result || result.ok !== true) {
+            return { ok: false, code: result?.error?.code || "failed", message: result?.error?.message };
+          }
+          return { ok: true, title: result.value?.title ?? title };
+        }
+        if (typeof sessions.using === "function") {
+          const result = await sessions.using(sessionId, { source: "workspaceOperation" }, (reference) => reference.binding.session.rename(title));
+          if (!result || result.ok !== true) {
+            return { ok: false, code: result?.error?.code || "failed", message: result?.error?.message };
+          }
+          return { ok: true, title: result.value?.title ?? title };
+        }
+        return { ok: false, code: "unavailable" };
+      } catch (reason) {
+        const code = reason?.rpcError?.code || reason?.code;
+        return { ok: false, code: code || "failed", message: reason instanceof Error ? reason.message : String(reason) };
+      }
+    },
+    forkSession: async (sessionId) => {
+      const service = uiWorkspace();
+      if (!service || typeof service.forkSession !== "function") return { ok: false, code: "unavailable" };
+      try {
+        const result = await service.forkSession(sessionId, void 0, { allowMigration: false });
+        if (result && result.ok === false) {
+          return { ok: false, code: result.error?.code || "failed", message: result.error?.message };
+        }
+        const childId = result && result.ok ? result.value?.sessionId : void 0;
+        if (!childId) return { ok: false, code: "failed" };
+        await service.openSession(childId);
+        return { ok: true, sessionId: childId };
+      } catch (reason) {
+        const code = reason?.name === "SessionForkError" ? reason?.rpcError?.code : reason?.rpcError?.code || reason?.code;
+        return { ok: false, code: code || "failed", message: reason instanceof Error ? reason.message : String(reason) };
+      }
+    }
   });
   ctx.slots.inject("conversation.hero.workspace", () => ctx.slots.register({
     name: "conversation.hero.workspace",

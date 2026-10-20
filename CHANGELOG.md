@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+## 0.3.2-alpha.1 - 2026-10-20
+
+- Restore per-chat actions on the plugin's own sidebar rows. DSH 0.2.x fills `sidebar.workspaces` with whichever plugin registers it, so replacing the stock browser also replaced its row context menu; chats offered no way to pin, rename, fork, archive, or copy their id. Right-clicking a chat row, or clicking the new `···` button, now opens that menu on the plugin's own rows.
+- Rebuild those actions against the 0.2.x runtime APIs: rename goes through `sessions.using(id, { source: "workspaceOperation" }, reference => reference.binding.session.rename(title))` behind a small dialog, fork calls `uiWorkspace.forkSession(id, undefined, { allowMigration: false })` and opens the new chat (with a localized hint when the source chat still needs a migration), copy uses `navigator.clipboard` with an `execCommand` fallback, and pin/archive reuse the existing sidebar preferences and archive path.
+- Deleting a chat is intentionally not offered: DSH 0.2.x exposes no public session-delete API.
+
 ## 0.3.1-alpha.1 - 2026-10-18
 
 - Support the DSH 0.2.x runtime line, verified against DSH 0.2.1-rc.2: the eight `@deepseek-ai/dsh-*` peer ranges now accept `0.1.0-rc.6` through the published `0.2.x` previews, so the plugin installs instead of being rejected as incompatible.
