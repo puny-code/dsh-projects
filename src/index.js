@@ -11,7 +11,15 @@ const name = "dsh-projects";
 const inject = ["connection", "webServer"];
 
 function apply(ctx) {
-  registerNativeBridge(ctx);
+  // The host web server rejects a second registration of the same prefix, so the
+  // bridge has to disappear with this plugin fiber. Without `ctx.effect(...)`
+  // every stop/start cycle from the plugin manager threw
+  // `webserver: duplicate prefix route "/dsh-projects"` and the plugin failed to
+  // re-activate.
+  ctx.effect(() => {
+    const dispose = registerNativeBridge(ctx);
+    return typeof dispose === "function" ? dispose : () => {};
+  });
 }
 
 export { apply, inject, name };

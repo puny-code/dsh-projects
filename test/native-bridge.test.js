@@ -151,3 +151,115 @@ test("registers the bridge as a loopback-only RPC channel", () => {
   assert.deepEqual(registration.options, { authority: "loopback" });
   assert.equal(typeof registration.handler, "function");
 });
+
+function fakeRequest({ url = `/dsh-projects/${ALLOCATE_DEFAULT_WORKSPACE_ENDPOINT}`, method = "POST", headers = { "content-type": "application/json" }, body = "" } = {}) {
+  return {
+    url,
+    method,
+    headers,
+    on() {},
+    async *[Symbol.asyncIterator]() {
+      if (body !== "") yield Buffer.from(body);
+    }
+  };
+}
+
+function fakeResponse() {
+  const state = { code: 0, headers: undefined, body: "", destroyed: false, headersSent: false };
+  return {
+    state,
+    get headersSent() {
+      return state.headersSent;
+    },
+    writeHead(code, headers) {
+      state.code = code;
+      state.headers = headers;
+      state.headersSent = true;
+    },
+    end(body) {
+      if (body !== undefined) state.body = String(body);
+    },
+    destroy() {
+      state.destroyed = true;
+    }
+  };
+}
+
+function fakeHost() {
+  const routes = new Map();
+  const server = {
+    prefixes: routes,
+    register(route) {
+      if (routes.has(route.path)) throw new Error(`webserver: duplicate ${route.kind} route "${route.path}"`);
+      routes.set(route.path, route);
+      return () => routes.delete(route.path);
+    }
+  };
+  return { routes, server };
+}
+
+const workingInternals = {
+  platform: "win32",
+  electron: false,
+  loadNativePicker: async () => ({ pickNativeDirectory: async () => "C:\\picked" }),
+  defaultWorkspace: {
+    home: "C:\\Users\\Public",
+    now: () => new Date(2026, 7, 17, 12, 0),
+    join: (...parts) => parts.join("\\"),
+    mkdir: async () => {}
+  }
+};
+
+test("reclaims a stale bridge route instead of failing the activation", async () => {
+  const { routes, server } = fakeHost();
+  const ctx = () => ({ webServer: server, connection: { admit: () => ({ peer: {} }) } });
+  const first = registerNativeBridge(ctx(), workingInternals);
+  assert.equal(routes.size, 1);
+  // The first activation never disposed its route (the pre-0.3.3-alpha.2 bug):
+  // a second activation registers the same prefix and must win.
+  const second = registerNativeBridge(ctx(), workingInternals);
+  assert.equal(routes.size, 1);
+  const route = routes.get(BRIDGE_CHANNEL);
+  const request = fakeRequest({
+    body: JSON.stringify({ type: "client-request", rpcId: "r1", method: ALLOCATE_DEFAULT_WORKSPACE_ENDPOINT, payload: {} })
+  });
+  const response = fakeResponse();
+  await route.handler(request, response);
+  assert.equal(response.state.code, 200);
+  assert.deepEqual(JSON.parse(response.state.body), {
+    type: "server-response",
+    rpcId: "r1",
+    result: { ok: true, value: { path: "C:\\Users\\Public\\Documents\\DSH-Default\\2026-08-17\\new-chat", root: "C:\\Users\\Public\\Documents\\DSH-Default" } }
+  });
+  second();
+  assert.equal(routes.size, 0);
+  first();
+});
+
+test("answers a handler failure with a bridge envelope instead of a bare 400", async () => {
+  const { routes, server } = fakeHost();
+  const ctx = {
+    webServer: server,
+    connection: {
+      admit() {
+        throw new Error("cannot get property webServer without inject");
+      }
+    }
+  };
+  const original = console.warn;
+  console.warn = () => {};
+  try {
+    const dispose = registerNativeBridge(ctx, workingInternals);
+    const route = routes.get(BRIDGE_CHANNEL);
+    const response = fakeResponse();
+    await route.handler(fakeRequest(), response);
+    assert.equal(response.state.code, 503);
+    const envelope = JSON.parse(response.state.body);
+    assert.equal(envelope.type, "server-response");
+    assert.equal(envelope.result.ok, false);
+    assert.equal(envelope.result.error.code, "unavailable");
+    dispose();
+  } finally {
+    console.warn = original;
+  }
+});

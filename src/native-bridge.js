@@ -181,6 +181,30 @@ function endpointFromPath(pathname) {
 }
 
 /**
+ * Drop a stale prefix route left in the host route table.
+ *
+ * The host web server keeps one Map per route kind; `register()` returns the
+ * disposer that removes the entry. An activation that never disposed its route
+ * (a bug fixed in 0.3.3-alpha.2) leaves its entry behind, and there is no public
+ * API to free it. Reaching the table directly is the only way to recover
+ * without restarting DSH, so it is attempted defensively: any mismatch in the
+ * host internals just returns false and leaves the caller on the no-op path.
+ */
+function reclaimRoute(ctx, path) {
+  try {
+    const server = ctx.webServer;
+    const table = server?.prefixes;
+    if (!table || typeof table.delete !== "function" || typeof table.has !== "function" || !table.has(path)) return false;
+    const existing = table.get(path);
+    if (existing?.kind !== undefined && existing.kind !== "prefix") return false;
+    table.delete(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Register the bridge as an exact protocol on the host web server.
  *
  * DSH 0.2.x made `ctx.connection.rpc.handle()` unusable from a profile plugin:
@@ -196,10 +220,28 @@ function endpointFromPath(pathname) {
  */
 function registerWebServerBridge(ctx, internals = {}) {
   const handle = createNativeBridgeHandler(internals);
-  return ctx.webServer.register({
+  let requestRpcId = "";
+  const route = {
     kind: "prefix",
     path: BRIDGE_CHANNEL,
     handler: async (request, response) => {
+      try {
+        await respond(request, response);
+      } catch (reason) {
+        // A thrown handler reaches the host web server, which answers a bare
+        // 400 with no body; report the failure on the bridge protocol instead.
+        const message = reason instanceof Error ? reason.message : String(reason);
+        console.warn("[dsh-projects] bridge handler failed:", message);
+        if (response.headersSent) {
+          response.destroy();
+          return;
+        }
+        response.writeHead(503, { "content-type": "application/json" });
+        response.end(JSON.stringify({ type: "server-response", rpcId: requestRpcId, result: { ok: false, error: { code: "unavailable", message, details: {} } } }));
+      }
+    }
+  };
+  const respond = async (request, response) => {
       const admission = ctx.connection.admit(request);
       if ("rejection" in admission) {
         response.writeHead(admission.rejection);
@@ -232,6 +274,7 @@ function registerWebServerBridge(ctx, internals = {}) {
         response.end("invalid client-request envelope");
         return;
       }
+      requestRpcId = message.rpcId;
       if (message.method !== endpoint) {
         response.writeHead(400);
         response.end("method does not match endpoint");
@@ -249,8 +292,26 @@ function registerWebServerBridge(ctx, internals = {}) {
       }
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ type: "server-response", rpcId: message.rpcId, result }));
+  };
+  try {
+    return ctx.webServer.register(route);
+  } catch (reason) {
+    const message = String(reason instanceof Error ? reason.message : reason);
+    if (/duplicate .*route/i.test(message)) {
+      // The duplicate is a route left behind by an activation that never
+      // disposed it (versions before 0.3.3-alpha.2). That handler closes over
+      // a disposed context and throws on every request, so talk to it never
+      // works: reclaim the prefix table entry and install this one instead.
+      const reclaimed = reclaimRoute(ctx, route.path);
+      if (reclaimed) {
+        console.warn("[dsh-projects] replaced a stale bridge route:", message);
+        return ctx.webServer.register(route);
+      }
+      console.warn("[dsh-projects] bridge route already registered:", message);
+      return () => {};
     }
-  });
+    throw reason;
+  }
 }
 
 function registerNativeBridge(ctx, internals = {}) {

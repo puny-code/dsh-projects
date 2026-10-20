@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+## 0.3.3-alpha.2 - 2026-10-20
+
+- Fix "enable failed" after turning the plugin off and on again. The host web server refuses a second registration of the same prefix, and the bridge route used to outlive its plugin fiber, so every re-activation died with `webserver: duplicate prefix route "/dsh-projects"`. The route is now registered through `ctx.effect(...)` and released with the plugin. A route left behind by an older activation closes over a disposed context and fails every request, so it is reclaimed and replaced instead of being reused.
+- Fix "普通对话创建失败: transport failure for /dsh-projects/allocateDefaultWorkspace: HTTP 400". That request came from the same stale route: its handler threw on the disposed context and the host web server answers a thrown handler with a bare `400` and no body. Bridge failures now answer on the bridge protocol (`503` plus a `server-response` envelope), so the browser half reports the real error instead of a transport failure.
+
 ## 0.3.3-alpha.1 - 2026-10-20
 
 - Make the restored chat menu look and behave like the stock one. The menu, its buttons and the rename dialog now render through the shell's own primitives (`Menu`, `MenuItemButton`, `Modal`, `Button`, `Tooltip`) and reuse the shell's outline icon set, so the surface, hover colour, keycaps and dialog chrome follow the active theme instead of the plugin's hand-drawn panel.
