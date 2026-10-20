@@ -354,6 +354,23 @@ var require_session_state = __commonJS({
 // src/client.cjs
 var React = require("react");
 var ReactDOM = require("react-dom");
+var primitives = null;
+try {
+  primitives = require("@deepseek-ai/dsh-client-ui-primitives") || null;
+} catch (error) {
+  primitives = null;
+}
+function isComponent(value) {
+  if (typeof value === "function") return true;
+  if (value === null || typeof value !== "object") return false;
+  const tag = value.$$typeof;
+  return tag === Symbol.for("react.forward_ref") || tag === Symbol.for("react.memo");
+}
+var DEFAULT_SHORTCUTS = {
+  "session.rename": { keys: ["Ctrl", "Alt", "G"], aria: "Control+Alt+G" },
+  "session.fork": { keys: ["Ctrl", "Alt", "F"], aria: "Control+Alt+F" },
+  "session.archive": { keys: ["Ctrl", "Shift", "A"], aria: "Control+Shift+A" }
+};
 var { createDefaultWorkspaceManager, unwrapDefaultWorkspaceResult } = require_default_workspace();
 var { pickProjectDirectory } = require_directory_picker_strategy();
 var { initialProjectIndex, nextProjectIndex } = require_project_picker();
@@ -405,12 +422,12 @@ var dictionaries = {
     unpinProject: "\u53D6\u6D88\u7F6E\u9876\u9879\u76EE",
     favoriteProject: "\u6536\u85CF\u9879\u76EE",
     unfavoriteProject: "\u53D6\u6D88\u6536\u85CF",
-    pinChat: "\u7F6E\u9876\u804A\u5929",
-    unpinChat: "\u53D6\u6D88\u7F6E\u9876\u804A\u5929",
+    pinChat: "\u7F6E\u9876\u4F1A\u8BDD",
+    unpinChat: "\u53D6\u6D88\u7F6E\u9876",
     openExplorer: "\u5728\u6587\u4EF6\u7BA1\u7406\u5668\u4E2D\u6253\u5F00",
     editProject: "\u7F16\u8F91\u9879\u76EE",
     archiveChats: "\u5F52\u6863\u804A\u5929",
-    archiveChat: "\u5F52\u6863\u804A\u5929",
+    archiveChat: "\u5F52\u6863\u4F1A\u8BDD",
     sessionActions: "\u4F1A\u8BDD\u64CD\u4F5C",
     renameSession: "\u91CD\u547D\u540D",
     renameSessionTitle: "\u91CD\u547D\u540D\u4F1A\u8BDD",
@@ -531,12 +548,12 @@ var dictionaries = {
     unpinProject: "Unpin project",
     favoriteProject: "Favorite project",
     unfavoriteProject: "Remove favorite",
-    pinChat: "Pin chat",
-    unpinChat: "Unpin chat",
+    pinChat: "Pin session",
+    unpinChat: "Unpin session",
     openExplorer: "Open in file manager",
     editProject: "Edit project",
     archiveChats: "Archive chats",
-    archiveChat: "Archive chat",
+    archiveChat: "Archive session",
     sessionActions: "Session actions",
     renameSession: "Rename",
     renameSessionTitle: "Rename chat",
@@ -643,6 +660,9 @@ var css = `
       .dshp-name-field:focus-within{border-color:var(--dsw-alias-state-business-primary,#4d86da);box-shadow:0 0 0 1px color-mix(in srgb,var(--dsw-alias-state-business-primary,#4d86da) 18%,transparent)}
       .dshp-name-icon{height:100%;width:44px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--dshp-border);color:var(--dshp-text-2)}
       .dshp-name-field input{min-width:0;flex:1;height:100%;box-sizing:border-box;border:0;outline:0;background:transparent;color:inherit;padding:0 12px;font:inherit;font-size:14px}
+      .dshp-name-input{box-sizing:border-box;width:100%;height:44px;border:1px solid var(--dsw-alias-border-1,rgba(0,0,0,.16));border-radius:16px;background:transparent;color:var(--dshp-text);padding:0 14px;font:inherit;font-size:14px;outline:0;transition:border-color 120ms ease,box-shadow 120ms ease}
+      .dshp-name-input:focus{border-color:var(--dsw-alias-state-business-primary,#4d86da);box-shadow:0 0 0 1px color-mix(in srgb,var(--dsw-alias-state-business-primary,#4d86da) 18%,transparent)}
+      .dshp-name-input:disabled{opacity:.6}
       .dshp-label{font-size:14px;font-weight:600;margin:0 0 9px}
       .dshp-folder-card{box-sizing:border-box;width:100%;min-height:102px;border:1px solid var(--dshp-border);border-radius:12px;background:var(--dshp-surface);color:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:15px;cursor:pointer;font:inherit}
       .dshp-folder-card:hover{background:var(--dshp-hover);border-color:var(--dshp-border-strong)}
@@ -846,6 +866,58 @@ function Icon({ name: name2, size = 18 }) {
     copy: [h("rect", { key: 1, x: 9, y: 9, width: 11, height: 11, rx: 2 }), h("path", { key: 2, d: "M15 5.5A1.5 1.5 0 0 0 13.5 4H6a2 2 0 0 0-2 2v7.5A1.5 1.5 0 0 0 5.5 15" })]
   };
   return h("svg", common, ...paths[name2] || paths.folder);
+}
+var nativeIconTable = null;
+function nativeIconComponent(name2) {
+  if (!primitives) return null;
+  if (!nativeIconTable) {
+    nativeIconTable = {
+      folder: primitives.IconFolderCloseRegular,
+      folderOpen: primitives.IconFolderOpenRegular,
+      search: primitives.IconSearchOutlineRegular,
+      plus: primitives.IconPlusOutlineRegular,
+      close: primitives.IconCloseFillRegular,
+      folderPlus: primitives.IconProjectAddOutlineRegular,
+      ellipsis: primitives.IconEllipsisOutlineRegular,
+      pin: primitives.IconPinOutlineRegular,
+      pinFill: primitives.IconPinFillRegular,
+      archive: primitives.IconArchiveOutlineRegular,
+      archiveOff: primitives.IconArchiveOffOutlineRegular,
+      star: primitives.IconSparkleRegular,
+      edit: primitives.IconEditOutlineRegular,
+      compose: primitives.IconNewChatOutlineRegular,
+      external: primitives.IconRightUpOutlineRegular,
+      check: primitives.IconCheckOutlineRegular,
+      list: primitives.IconFlatListOutlineRegular,
+      chat: primitives.IconNewChatOutlineRegular,
+      restore: primitives.IconUnarchiveOutlineRegular,
+      branch: primitives.IconBranchOutlineRegular,
+      copy: primitives.IconCopyOutlineRegular,
+      trash: primitives.IconTrashOutlineRegular
+    };
+  }
+  return nativeIconTable[name2] || null;
+}
+function SvgIcon({ name: name2, size = 16 }) {
+  const Native = nativeIconComponent(name2);
+  if (isComponent(Native)) return h(Native, { size });
+  return h(Icon, { name: name2, size: size + 2 });
+}
+function MiniButton({ icon, label, active, menuOpen, haspopup, onClick }) {
+  const button = h("button", {
+    type: "button",
+    className: "dshp-mini-button",
+    "data-active": active ? "true" : void 0,
+    "data-menu-open": menuOpen ? "true" : void 0,
+    "aria-label": label,
+    "aria-haspopup": haspopup,
+    title: primitives && isComponent(primitives.Tooltip) ? void 0 : label,
+    onClick
+  }, h(SvgIcon, { name: icon, size: 16 }));
+  if (primitives && isComponent(primitives.Tooltip)) {
+    return h(primitives.Tooltip, { label, side: "bottom", align: "end", delayMs: 400, portal: true }, button);
+  }
+  return button;
 }
 function format(t, key, vars = {}) {
   let text = t(key);
@@ -1449,8 +1521,9 @@ function PreviewPortal({ position, children }) {
 }
 function ContextMenu({ menu, items, onClose }) {
   const menuRef = React.useRef(null);
+  const native = primitives !== null && isComponent(primitives.Menu);
   React.useEffect(() => {
-    if (!menu) return;
+    if (native || !menu) return;
     const outside = (event) => {
       if (!event.target.closest?.(".dshp-context")) onClose();
     };
@@ -1476,8 +1549,44 @@ function ContextMenu({ menu, items, onClose }) {
       document.removeEventListener("pointerdown", outside, true);
       window.removeEventListener("keydown", key);
     };
-  }, [menu, onClose]);
+  }, [menu, onClose, native]);
   if (!menu) return null;
+  if (native) {
+    const nativeItems = items.map((item) => {
+      if (item.type === "label") return { type: "label", id: item.id, text: item.label };
+      if (item.type === "separator") return { type: "separator", id: item.id };
+      return {
+        id: item.id,
+        label: item.label,
+        icon: item.icon ? h(SvgIcon, { name: item.icon, size: 14 }) : void 0,
+        danger: item.danger === true,
+        disabled: item.disabled === true,
+        shortcut: item.shortcut,
+        submenu: item.submenu
+      };
+    });
+    return h(primitives.Menu, {
+      open: true,
+      items: nativeItems,
+      onSelect: (id) => {
+        const item = items.find((entry) => entry.id === id);
+        onClose();
+        if (item && typeof item.onClick === "function") item.onClick();
+      },
+      onClose,
+      portal: true,
+      side: "bottom",
+      align: menu.align || "start",
+      getAnchorRect: () => menu.rect || {
+        left: menu.left,
+        top: menu.top,
+        right: menu.left,
+        bottom: menu.top,
+        width: 0,
+        height: 0
+      }
+    });
+  }
   return ReactDOM.createPortal(
     h(
       "div",
@@ -1746,8 +1855,9 @@ function RenameSessionModal({ session, renameSession, onClose, t }) {
   }, [session?.id]);
   if (!session) return null;
   const trimmed = value.trim();
+  const blocked = busy || !trimmed;
   const save = async () => {
-    if (!trimmed || trimmed === initial || busy) return;
+    if (!trimmed || busy) return;
     setBusy(true);
     setError("");
     try {
@@ -1759,6 +1869,45 @@ function RenameSessionModal({ session, renameSession, onClose, t }) {
       setBusy(false);
     }
   };
+  const field = h("input", {
+    ref: inputRef,
+    className: "dshp-name-input",
+    value,
+    maxLength: 120,
+    placeholder: t("sessionName"),
+    "aria-label": t("sessionName"),
+    "data-modal-autofocus": true,
+    disabled: busy,
+    onChange: (event) => {
+      setValue(event.target.value);
+      setError("");
+    },
+    onKeyDown: (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        save();
+      }
+    }
+  });
+  const errorLine = error ? h("div", { className: "dshp-error", role: "alert" }, error) : null;
+  if (primitives && isComponent(primitives.Modal) && isComponent(primitives.Button)) {
+    return h(primitives.Modal, {
+      open: true,
+      onClose: () => {
+        if (!busy) onClose();
+      },
+      closeLabel: t("cancel"),
+      title: t("renameSessionTitle"),
+      footer: h(
+        React.Fragment,
+        null,
+        h(primitives.Button, { variant: "outline", disabled: busy, onClick: () => {
+          if (!busy) onClose();
+        } }, t("cancel")),
+        h(primitives.Button, { variant: "primary", disabled: blocked, onClick: save }, t("renameSession"))
+      )
+    }, field, errorLine);
+  }
   return ReactDOM.createPortal(
     h(
       "div",
@@ -1772,25 +1921,20 @@ function RenameSessionModal({ session, renameSession, onClose, t }) {
           "div",
           { className: "dshp-modal-head" },
           h("h2", { className: "dshp-modal-title" }, t("renameSessionTitle")),
-          h("button", { type: "button", className: "dshp-icon-button", onClick: onClose }, h(Icon, { name: "close", size: 19 }))
+          h("button", { type: "button", className: "dshp-icon-button", onClick: onClose }, h(SvgIcon, { name: "close", size: 19 }))
         ),
         h(
           "div",
           { className: "dshp-name-field" },
-          h("div", { className: "dshp-name-icon" }, h(Icon, { name: "chat", size: 18 })),
-          h("input", { ref: inputRef, value, maxLength: 120, placeholder: t("sessionName"), onChange: (event) => {
-            setValue(event.target.value);
-            setError("");
-          }, onKeyDown: (event) => {
-            if (event.key === "Enter") save();
-          } })
+          h("div", { className: "dshp-name-icon" }, h(SvgIcon, { name: "chat", size: 18 })),
+          field
         ),
-        h("div", { className: "dshp-error" }, error),
+        errorLine,
         h(
           "div",
           { className: "dshp-modal-actions" },
           h("button", { type: "button", className: "dshp-button", disabled: busy, onClick: onClose }, t("cancel")),
-          h("button", { type: "button", className: "dshp-button dshp-button-primary", disabled: busy || !trimmed || trimmed === initial, onClick: save }, t("save"))
+          h("button", { type: "button", className: "dshp-button dshp-button-primary", disabled: blocked, onClick: save }, t("renameSession"))
         )
       )
     ),
@@ -1834,21 +1978,21 @@ function SessionRow({ session, project, current, pinned, draggable, dragOver, me
     h(
       "div",
       { className: "dshp-session-actions" },
-      h("button", { type: "button", className: "dshp-mini-button", "data-active": pinned ? "true" : "false", title: pinned ? t("unpinChat") : t("pinChat"), onClick: (event) => {
+      h(MiniButton, { icon: pinned ? "pinFill" : "pin", label: pinned ? t("unpinChat") : t("pinChat"), active: pinned, onClick: (event) => {
         event.stopPropagation();
         hover.leave();
         onTogglePin(session.id);
-      } }, h(Icon, { name: "pin", size: 15 })),
-      h("button", { type: "button", className: "dshp-mini-button", title: t("archiveChat"), onClick: (event) => {
+      } }),
+      h(MiniButton, { icon: "archive", label: t("archiveChat"), onClick: (event) => {
         event.stopPropagation();
         hover.leave();
         onArchive(session.id);
-      } }, h(Icon, { name: "archive", size: 15 })),
-      h("button", { type: "button", className: "dshp-mini-button", "data-menu-open": menuOpen ? "true" : "false", title: t("sessionActions"), "aria-label": t("sessionActions"), onClick: (event) => {
+      } }),
+      h(MiniButton, { icon: "ellipsis", label: t("sessionActions"), haspopup: "menu", menuOpen, onClick: (event) => {
         event.stopPropagation();
         hover.leave();
         onMenu(event, session);
-      } }, h(Icon, { name: "ellipsis", size: 17 }))
+      } })
     ),
     h(
       PreviewPortal,
@@ -1888,16 +2032,16 @@ function ProjectRow({ project, sessions, pinned, favorite, showAttentionBadge, m
     h(
       "div",
       { className: "dshp-project-actions" },
-      h("button", { type: "button", className: "dshp-mini-button", title: t("editProject"), onClick: (event) => {
+      h(MiniButton, { icon: "ellipsis", label: t("editProject"), haspopup: "menu", menuOpen, onClick: (event) => {
         event.stopPropagation();
         hover.leave();
         onMenu(event, project);
-      } }, h(Icon, { name: "ellipsis", size: 17 })),
-      h("button", { type: "button", className: "dshp-mini-button", title: t("newSession"), onClick: (event) => {
+      } }),
+      h(MiniButton, { icon: "compose", label: t("newSession"), onClick: (event) => {
         event.stopPropagation();
         hover.leave();
         onStart(project.workspaceId);
-      } }, h(Icon, { name: "compose", size: 16 }))
+      } })
     ),
     h(
       PreviewPortal,
@@ -2096,7 +2240,7 @@ function ArchiveCenterModal({ open, archivedIds, projects, sessionState, restore
     document.body
   );
 }
-function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, openSession, startSession, startDefaultSession, isDefaultWorkspace, createWorkspace, renameWorkspace, pickDirectory, listDirectory, deleteWorkspace, insertWorkspaceBefore, archiveSession, restoreSession, insertSessionBefore, openPath, searchSessions, searchResultLimit, renameSession, forkSession, t }) {
+function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, openSession, startSession, startDefaultSession, isDefaultWorkspace, createWorkspace, renameWorkspace, pickDirectory, listDirectory, deleteWorkspace, insertWorkspaceBefore, archiveSession, restoreSession, insertSessionBefore, openPath, searchSessions, searchResultLimit, renameSession, forkSession, shortcutFor, t }) {
   const workspaceState = useWorkspaces((state) => state);
   const sessionState = useSessions((state) => state);
   const [prefs, setPrefs] = useSidebarPrefs();
@@ -2222,10 +2366,7 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
   }
   const openMenuAt = (event, kind, target) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const width = 250;
-    const left = Math.max(8, Math.min(rect.right + 6, window.innerWidth - width - 8));
-    const top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 360));
-    setMenu({ kind, target, left, top });
+    setMenu({ kind, target, rect, align: "end" });
   };
   const togglePref = (key, id) => setPrefs((current) => ({ ...current, [key]: toggleId(current[key], id) }));
   const archiveOne = (sessionId) => run(() => archiveSession(sessionId));
@@ -2242,13 +2383,19 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
     if (typeof result.message === "string" && /already owned by an active write handle|write handle/i.test(result.message)) return t("sessionBusy");
     return result.message || t("operationFailed");
   };
+  const shortcutOf = (id) => {
+    const live = typeof shortcutFor === "function" ? shortcutFor(id) : void 0;
+    return live || DEFAULT_SHORTCUTS[id];
+  };
   const openSessionMenu = (event, session) => {
-    const width = 250;
     const rect = event?.currentTarget?.getBoundingClientRect?.();
     const fromPointer = event?.type === "contextmenu" && typeof event.clientX === "number" && event.clientX > 0;
-    const x = fromPointer ? event.clientX : rect ? rect.right + 6 : 12;
-    const y = fromPointer ? event.clientY : rect ? rect.bottom + 4 : 12;
-    setMenu({ kind: "session", target: session, left: Math.max(8, Math.min(x, window.innerWidth - width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - 320)) });
+    setMenu({
+      kind: "session",
+      target: session,
+      rect: fromPointer ? { left: event.clientX, top: event.clientY, right: event.clientX, bottom: event.clientY, width: 0, height: 0 } : rect || { left: 12, top: 12, right: 12, bottom: 12, width: 0, height: 0 },
+      align: fromPointer ? "start" : "end"
+    });
   };
   const renameOne = async (sessionId, title) => {
     const result = await renameSession(sessionId, title);
@@ -2313,12 +2460,12 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
     } }
   ].filter(Boolean) : [];
   const selectedSession = menu?.kind === "session" ? menu.target : null;
+  const sessionPinned = selectedSession ? pinnedSessions.has(selectedSession.id) : false;
   const sessionMenuItems = selectedSession ? [
-    { id: "pin-session", label: pinnedSessions.has(selectedSession.id) ? t("unpinChat") : t("pinChat"), icon: "pin", checked: pinnedSessions.has(selectedSession.id), onClick: () => togglePref("pinnedSessions", selectedSession.id) },
-    { id: "rename-session", label: t("renameSession"), icon: "edit", onClick: () => setRenameTarget(selectedSession) },
-    { id: "fork-session", label: t("forkSession"), icon: "branch", onClick: () => forkOne(selectedSession.id) },
-    { type: "separator", id: "session-sep" },
-    { id: "archive-session", label: t("archiveChat"), icon: "archive", onClick: () => archiveOne(selectedSession.id) },
+    { id: "pin-session", label: sessionPinned ? t("unpinChat") : t("pinChat"), icon: sessionPinned ? "pinFill" : "pin", onClick: () => togglePref("pinnedSessions", selectedSession.id) },
+    { id: "rename-session", label: t("renameSession"), icon: "edit", shortcut: shortcutOf("session.rename"), onClick: () => setRenameTarget(selectedSession) },
+    { id: "fork-session", label: t("forkSession"), icon: "branch", shortcut: shortcutOf("session.fork"), onClick: () => forkOne(selectedSession.id) },
+    { id: "archive-session", label: t("archiveChat"), icon: "archive", shortcut: shortcutOf("session.archive"), onClick: () => archiveOne(selectedSession.id) },
     { id: "copy-session-id", label: t("copySessionId"), icon: "copy", onClick: () => copySessionId(selectedSession.id) }
   ] : [];
   const dragPropsForProject = (project) => ({
@@ -2438,16 +2585,16 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
           h(
             "div",
             { className: "dshp-section-actions" },
-            h("button", { type: "button", className: "dshp-mini-button", "data-active": searchOpen ? "true" : "false", title: t("globalSearch"), onClick: () => {
+            h(MiniButton, { icon: "search", label: t("globalSearch"), active: searchOpen, onClick: () => {
               setSearchOpen((value) => !value);
               setMenu(null);
-            } }, h(Icon, { name: "search", size: 16 })),
-            h("button", { type: "button", className: "dshp-mini-button", "data-active": archiveOpen ? "true" : "false", title: t("archiveCenter"), onClick: () => {
+            } }),
+            h(MiniButton, { icon: "archive", label: t("archiveCenter"), active: archiveOpen, onClick: () => {
               setArchiveOpen(true);
               setMenu(null);
-            } }, h(Icon, { name: "archive", size: 16 })),
-            h("button", { type: "button", className: "dshp-mini-button", title: t("organizeSidebar"), onClick: (event) => openMenuAt(event, "view", null) }, h(Icon, { name: "ellipsis", size: 17 })),
-            h("button", { type: "button", className: "dshp-mini-button", title: t("newProjectShort"), onClick: () => setCreateOpen(true) }, h(Icon, { name: "plus", size: 17 }))
+            } }),
+            h(MiniButton, { icon: "ellipsis", label: t("organizeSidebar"), haspopup: "menu", menuOpen: menu?.kind === "view", onClick: (event) => openMenuAt(event, "view", null) }),
+            h(MiniButton, { icon: "plus", label: t("newProjectShort"), onClick: () => setCreateOpen(true) })
           )
         ),
         actionError ? h("div", { className: "dshp-action-error" }, actionError) : null,
@@ -2557,6 +2704,24 @@ function apply(ctx) {
     }
     throw new Error("dsh-projects: opening a path is unavailable here");
   };
+  const shortcutFor = (id) => {
+    let service = null;
+    try {
+      service = typeof ctx.get === "function" ? ctx.get("shortcuts", false) : ctx.shortcuts;
+    } catch (error) {
+      service = null;
+    }
+    const catalog = service && service.catalog ? service.catalog : null;
+    let rows = null;
+    try {
+      if (catalog && typeof catalog.getSnapshot === "function") rows = catalog.getSnapshot();
+      else if (Array.isArray(catalog)) rows = catalog;
+    } catch (error) {
+      rows = null;
+    }
+    const row = Array.isArray(rows) ? rows.find((entry) => entry && entry.id === id) : void 0;
+    return row && Array.isArray(row.keys) ? { keys: row.keys, aria: row.aria } : void 0;
+  };
   const defaultWorkspace = createDefaultWorkspaceManager({
     workspaces: uiWorkspace(),
     storage: localStorage
@@ -2616,6 +2781,7 @@ function apply(ctx) {
       return result.value;
     },
     searchResultLimit: ctx.sessions.searchResultLimit,
+    shortcutFor,
     renameSession: async (sessionId, title) => {
       const sessions = ctx.sessions;
       if (!sessions) return { ok: false, code: "unavailable" };

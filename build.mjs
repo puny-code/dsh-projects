@@ -10,7 +10,7 @@ await build({
   format: "cjs",
   platform: "browser",
   target: ["es2022"],
-  external: ["react", "react-dom"],
+  external: ["react", "react-dom", "@deepseek-ai/dsh-client-ui-primitives"],
   banner: {
     js: "window.__ModuleLoader__.load({ id: 'dsh-projects', factory: (require) => { var module = { exports: {} }; var exports = module.exports;"
   },

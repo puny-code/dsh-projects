@@ -4,6 +4,13 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+## 0.3.3-alpha.1 - 2026-10-20
+
+- Make the restored chat menu look and behave like the stock one. The menu, its buttons and the rename dialog now render through the shell's own primitives (`Menu`, `MenuItemButton`, `Modal`, `Button`, `Tooltip`) and reuse the shell's outline icon set, so the surface, hover colour, keycaps and dialog chrome follow the active theme instead of the plugin's hand-drawn panel.
+- Show the same keyboard hints as the stock menu (rename, fork, archive) by reading the shell shortcut catalog at open time, with built-in defaults when the host does not expose it.
+- The `···` button, the per-row pin/archive buttons and the sidebar toolbar buttons are now shell-styled icon buttons with tooltips and proper `aria-haspopup` / `aria-menu-open` state.
+- Both halves degrade to the previous hand-drawn menu and dialog when the primitives module is unavailable.
+
 ## 0.3.2-alpha.1 - 2026-10-20
 
 - Restore per-chat actions on the plugin's own sidebar rows. DSH 0.2.x fills `sidebar.workspaces` with whichever plugin registers it, so replacing the stock browser also replaced its row context menu; chats offered no way to pin, rename, fork, archive, or copy their id. Right-clicking a chat row, or clicking the new `···` button, now opens that menu on the plugin's own rows.
