@@ -1813,7 +1813,8 @@ const DEFAULT_SHORTCUTS = {
       React.useEffect(() => {
         if (prunedStaleRef.current || workspaceState.phase !== "ready") return;
         const stale = (workspaceState.items || []).filter((project) => {
-          if (isDefaultWorkspace(project) || !isPortableDefaultPath(project.path)) return false;
+          // 只认旧版本分配出来的 DSH-Default 日期目录；DSH 自带的默认工作区不匹配这个模式。
+          if (!isPortableDefaultPath(project.path)) return false;
           return !(project.sessionIds || []).some((id) => visibleSession(sessionState.byId[id]));
         });
         prunedStaleRef.current = true;

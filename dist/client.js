@@ -2351,7 +2351,7 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
   React.useEffect(() => {
     if (prunedStaleRef.current || workspaceState.phase !== "ready") return;
     const stale = (workspaceState.items || []).filter((project) => {
-      if (isDefaultWorkspace(project) || !isPortableDefaultPath(project.path)) return false;
+      if (!isPortableDefaultPath(project.path)) return false;
       return !(project.sessionIds || []).some((id) => visibleSession(sessionState.byId[id]));
     });
     prunedStaleRef.current = true;
