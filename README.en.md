@@ -99,13 +99,13 @@ The patched Desktop installer in early Releases has been superseded by the offic
 
 ## Chat without choosing a project
 
-A regular chat receives an isolated task directory automatically:
+A regular chat runs in the default workspace DSH already maintains instead of allocating a new folder every time:
 
 ```text
-~/Documents/DSH-Default/YYYY-MM-DD/new-chat[-N]
+~/Documents/deepseek-harness/default-workspace
 ```
 
-Default tasks stay out of the Projects section but remain available in Recent. Each chat gets its own workspace instead of treating the whole Documents or home directory as writable.
+The default workspace never shows up in the Projects list (DSH owns it), while its sessions still appear in Recent. The old `~/Documents/DSH-Default/YYYY-MM-DD/new-chat[-N]` folders are no longer created; existing ones are left untouched for you to delete.
 
 ## Compatibility
 

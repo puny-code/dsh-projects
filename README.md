@@ -99,13 +99,13 @@ Windows PowerShell 示例路径可写为 `link:C:/path/to/dsh-projects`。
 
 ## 不选择项目也能聊天
 
-普通聊天会自动获得独立任务目录：
+普通对话直接回落到 DSH 自带的默认工作区，不再每次新建目录：
 
 ```text
-~/Documents/DSH-Default/YYYY-MM-DD/new-chat[-N]
+~/Documents/deepseek-harness/default-workspace
 ```
 
-默认任务不会混入项目列表，但仍会出现在“最近”区域。每次聊天都有自己的工作目录，不会把整个 `Documents` 或用户主目录当作 Workspace。
+默认工作区不会出现在项目列表里（它由 DSH 自身托管），但其中的会话仍会出现在“最近”区域。旧版本创建的 `~/Documents/DSH-Default/YYYY-MM-DD/new-chat[-N]` 目录不再产生；已存在的目录不会被插件改动，需要的话可以自己删。
 
 ## 兼容性
 

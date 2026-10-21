@@ -139,7 +139,8 @@ const DEFAULT_SHORTCUTS = {
         ,restoreFailed: "恢复失败：{message}"
         ,restoreUnavailable: "当前 DSH 版本没有公开取消归档接口；你仍可以查看归档内容，但暂时不能从这里恢复。"
         ,normalChat: "普通对话"
-        ,normalChatHint: "不加入项目，使用默认任务文件夹"
+        ,normalChatHint: "不加入项目，直接在默认工作区里开始"
+        ,defaultWorkspace: "默认工作区"
         ,startingChat: "正在创建普通对话…"
         ,defaultChatFailed: "普通对话创建失败：{message}"
         ,waitingApproval: "等待审批"
@@ -269,7 +270,8 @@ const DEFAULT_SHORTCUTS = {
         ,restoreFailed: "Could not restore: {message}"
         ,restoreUnavailable: "This DSH version does not expose an unarchive API. Archived chats remain visible here, but cannot be restored from this panel."
         ,normalChat: "Regular chat"
-        ,normalChatHint: "No project; use the default task folder"
+        ,normalChatHint: "No project; start in the default workspace"
+        ,defaultWorkspace: "Default workspace"
         ,startingChat: "Starting regular chat…"
         ,defaultChatFailed: "Could not start regular chat: {message}"
         ,waitingApproval: "Waiting for approval"
@@ -890,7 +892,9 @@ const DEFAULT_SHORTCUTS = {
       const workspaceState = useWorkspaces((state) => state);
       const sessionState = useSessions((state) => state);
       const allProjects = workspaceState.items || [];
-      const rawProjects = allProjects.filter((project) => !isDefaultWorkspace(project));
+      const rawProjects = allProjects
+        .filter((project) => !isDefaultWorkspace(project))
+        .map((project) => project.title === "default-workspace" ? { ...project, title: t("defaultWorkspace") } : project);
       const pickerPrefs = readSidebarPrefs();
       const projects = composeProjectGroups(rawProjects, pickerPrefs.projectGroups.supported === false ? [] : pickerPrefs.projectGroups.groups).projects;
       const selectedProjectId = projects.find((project) => project.advancedGroup && project.memberWorkspaceIds.includes(selectedId))?.workspaceId || selectedId;
@@ -1745,9 +1749,10 @@ const DEFAULT_SHORTCUTS = {
       const [drag, setDrag] = React.useState(null);
       const [dragOver, setDragOver] = React.useState(null);
       const searchInputRef = React.useRef(null);
-      const defaultBootRef = React.useRef(false);
       const allProjects = workspaceState.items || [];
-      const rawProjects = React.useMemo(() => allProjects.filter((project) => !isDefaultWorkspace(project)), [allProjects, isDefaultWorkspace]);
+      const rawProjects = React.useMemo(() => allProjects
+        .filter((project) => !isDefaultWorkspace(project))
+        .map((project) => project.title === "default-workspace" ? { ...project, title: t("defaultWorkspace") } : project), [allProjects, isDefaultWorkspace, t]);
       const canEditProjectGroups = prefs.projectGroups.supported !== false;
       const groupComposition = React.useMemo(() => composeProjectGroups(rawProjects, canEditProjectGroups ? prefs.projectGroups.groups : []), [rawProjects, canEditProjectGroups, prefs.projectGroups]);
       const projects = groupComposition.projects;
@@ -1797,14 +1802,9 @@ const DEFAULT_SHORTCUTS = {
         setTimeout(() => setActionError(""), 5000);
       };
       const run = (task) => Promise.resolve().then(task).catch(handleFailure);
-      React.useEffect(() => {
-        if (workspaceState.phase !== "ready" || sessionState.current != null || defaultBootRef.current) return;
-        defaultBootRef.current = true;
-        Promise.resolve(startDefaultSession()).catch((reason) => {
-          setActionError(format(t, "defaultChatFailed", { message: reason instanceof Error ? reason.message : String(reason) }));
-          setTimeout(() => setActionError(""), 5000);
-        });
-      }, [workspaceState.phase, sessionState.current, startDefaultSession, t]);
+      // 侧栏挂载时不再自动开普通对话：以前这段逻辑每次界面重载都会新建一个
+      // DSH-Default 文件夹 + 工作区 + 空会话，是 new-chat-NN 工作区堆积的来源。
+      // 现在只在用户显式点“普通对话”（ProjectPicker）时才开始会话。
       const sessionsFor = (project) => {
         const list = (project.sessionIds || []).map((id) => sessionState.byId[id]).filter(visibleSession);
         if (prefs.orderBy === "manual") return list;
@@ -2171,7 +2171,21 @@ const DEFAULT_SHORTCUTS = {
         workspaces: uiWorkspace(),
         storage: localStorage
       });
+      // 普通对话回落到 DSH 自带的首个默认工作区（<Documents>/deepseek-harness/default-workspace）。
+      // initializeDefault() 是幂等的：已经存在就返回同一条记录，不会新建目录或工作区，
+      // 所以反复点普通对话、刷新、重启都不会再累积 new-chat 文件夹。
       const startDefaultSession = async () => {
+        if (typeof ctx.workspaces.initializeDefault === "function") {
+          try {
+            const fallback = await ctx.workspaces.initializeDefault();
+            if (fallback) {
+              uiWorkspace().startSession(fallback.workspaceId);
+              return fallback.workspaceId;
+            }
+          } catch (reason) {
+            console.warn("[dsh-projects] default workspace unavailable; falling back to an allocated folder", reason);
+          }
+        }
         let cwd;
         if (ctx.connection?.isLoopback && ctx.connection?.rpc?.call) {
           const result = await ctx.connection.rpc.call(

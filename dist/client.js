@@ -481,7 +481,8 @@ var dictionaries = {
     restoreFailed: "\u6062\u590D\u5931\u8D25\uFF1A{message}",
     restoreUnavailable: "\u5F53\u524D DSH \u7248\u672C\u6CA1\u6709\u516C\u5F00\u53D6\u6D88\u5F52\u6863\u63A5\u53E3\uFF1B\u4F60\u4ECD\u53EF\u4EE5\u67E5\u770B\u5F52\u6863\u5185\u5BB9\uFF0C\u4F46\u6682\u65F6\u4E0D\u80FD\u4ECE\u8FD9\u91CC\u6062\u590D\u3002",
     normalChat: "\u666E\u901A\u5BF9\u8BDD",
-    normalChatHint: "\u4E0D\u52A0\u5165\u9879\u76EE\uFF0C\u4F7F\u7528\u9ED8\u8BA4\u4EFB\u52A1\u6587\u4EF6\u5939",
+    normalChatHint: "\u4E0D\u52A0\u5165\u9879\u76EE\uFF0C\u76F4\u63A5\u5728\u9ED8\u8BA4\u5DE5\u4F5C\u533A\u91CC\u5F00\u59CB",
+    defaultWorkspace: "\u9ED8\u8BA4\u5DE5\u4F5C\u533A",
     startingChat: "\u6B63\u5728\u521B\u5EFA\u666E\u901A\u5BF9\u8BDD\u2026",
     defaultChatFailed: "\u666E\u901A\u5BF9\u8BDD\u521B\u5EFA\u5931\u8D25\uFF1A{message}",
     waitingApproval: "\u7B49\u5F85\u5BA1\u6279",
@@ -611,7 +612,8 @@ var dictionaries = {
     restoreFailed: "Could not restore: {message}",
     restoreUnavailable: "This DSH version does not expose an unarchive API. Archived chats remain visible here, but cannot be restored from this panel.",
     normalChat: "Regular chat",
-    normalChatHint: "No project; use the default task folder",
+    normalChatHint: "No project; start in the default workspace",
+    defaultWorkspace: "Default workspace",
     startingChat: "Starting regular chat\u2026",
     defaultChatFailed: "Could not start regular chat: {message}",
     waitingApproval: "Waiting for approval",
@@ -1236,7 +1238,7 @@ function ProjectPicker({ open, anchorRef, selectedId, onPick, onClose, useWorksp
   const workspaceState = useWorkspaces((state) => state);
   const sessionState = useSessions((state) => state);
   const allProjects = workspaceState.items || [];
-  const rawProjects = allProjects.filter((project) => !isDefaultWorkspace(project));
+  const rawProjects = allProjects.filter((project) => !isDefaultWorkspace(project)).map((project) => project.title === "default-workspace" ? { ...project, title: t("defaultWorkspace") } : project);
   const pickerPrefs = readSidebarPrefs();
   const projects = composeProjectGroups(rawProjects, pickerPrefs.projectGroups.supported === false ? [] : pickerPrefs.projectGroups.groups).projects;
   const selectedProjectId = projects.find((project) => project.advancedGroup && project.memberWorkspaceIds.includes(selectedId))?.workspaceId || selectedId;
@@ -2287,9 +2289,8 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
   const [drag, setDrag] = React.useState(null);
   const [dragOver, setDragOver] = React.useState(null);
   const searchInputRef = React.useRef(null);
-  const defaultBootRef = React.useRef(false);
   const allProjects = workspaceState.items || [];
-  const rawProjects = React.useMemo(() => allProjects.filter((project) => !isDefaultWorkspace(project)), [allProjects, isDefaultWorkspace]);
+  const rawProjects = React.useMemo(() => allProjects.filter((project) => !isDefaultWorkspace(project)).map((project) => project.title === "default-workspace" ? { ...project, title: t("defaultWorkspace") } : project), [allProjects, isDefaultWorkspace, t]);
   const canEditProjectGroups = prefs.projectGroups.supported !== false;
   const groupComposition = React.useMemo(() => composeProjectGroups(rawProjects, canEditProjectGroups ? prefs.projectGroups.groups : []), [rawProjects, canEditProjectGroups, prefs.projectGroups]);
   const projects = groupComposition.projects;
@@ -2346,14 +2347,6 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
     setTimeout(() => setActionError(""), 5e3);
   };
   const run = (task) => Promise.resolve().then(task).catch(handleFailure);
-  React.useEffect(() => {
-    if (workspaceState.phase !== "ready" || sessionState.current != null || defaultBootRef.current) return;
-    defaultBootRef.current = true;
-    Promise.resolve(startDefaultSession()).catch((reason) => {
-      setActionError(format(t, "defaultChatFailed", { message: reason instanceof Error ? reason.message : String(reason) }));
-      setTimeout(() => setActionError(""), 5e3);
-    });
-  }, [workspaceState.phase, sessionState.current, startDefaultSession, t]);
   const sessionsFor = (project) => {
     const list = (project.sessionIds || []).map((id) => sessionState.byId[id]).filter(visibleSession);
     if (prefs.orderBy === "manual") return list;
@@ -2769,6 +2762,17 @@ function apply(ctx) {
     storage: localStorage
   });
   const startDefaultSession = async () => {
+    if (typeof ctx.workspaces.initializeDefault === "function") {
+      try {
+        const fallback = await ctx.workspaces.initializeDefault();
+        if (fallback) {
+          uiWorkspace().startSession(fallback.workspaceId);
+          return fallback.workspaceId;
+        }
+      } catch (reason) {
+        console.warn("[dsh-projects] default workspace unavailable; falling back to an allocated folder", reason);
+      }
+    }
     let cwd;
     if (ctx.connection?.isLoopback && ctx.connection?.rpc?.call) {
       const result = await ctx.connection.rpc.call(
