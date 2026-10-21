@@ -29,7 +29,7 @@ const DEFAULT_SHORTCUTS = {
       "session.fork": { keys: ["Ctrl", "Alt", "F"], aria: "Control+Alt+F" },
       "session.archive": { keys: ["Ctrl", "Shift", "A"], aria: "Control+Shift+A" }
     };
-    const { createDefaultWorkspaceManager, unwrapDefaultWorkspaceResult } = require("./core/default-workspace.cjs");
+    const { createDefaultWorkspaceManager, isPortableDefaultPath, unwrapDefaultWorkspaceResult } = require("./core/default-workspace.cjs");
     const { pickProjectDirectory } = require("./core/directory-picker-strategy.cjs");
     const { initialProjectIndex, nextProjectIndex } = require("./core/project-picker.cjs");
     const { parentDirectory } = require("./core/picker-history.cjs");
@@ -1805,6 +1805,29 @@ const DEFAULT_SHORTCUTS = {
       // 侧栏挂载时不再自动开普通对话：以前这段逻辑每次界面重载都会新建一个
       // DSH-Default 文件夹 + 工作区 + 空会话，是 new-chat-NN 工作区堆积的来源。
       // 现在只在用户显式点“普通对话”（ProjectPicker）时才开始会话。
+      //
+      // 一次性清理旧版本留下的 workSpace 注册：路径形如
+      // ~/Documents/DSH-Default/<日期>/new-chat[-N] 且没有任何有效会话的，
+      // 直接删掉注册记录（不动目录，里面的文件如果用户后来放过东西就留着）。
+      const prunedStaleRef = React.useRef(false);
+      React.useEffect(() => {
+        if (prunedStaleRef.current || workspaceState.phase !== "ready") return;
+        const stale = (workspaceState.items || []).filter((project) => {
+          if (isDefaultWorkspace(project) || !isPortableDefaultPath(project.path)) return false;
+          return !(project.sessionIds || []).some((id) => visibleSession(sessionState.byId[id]));
+        });
+        prunedStaleRef.current = true;
+        if (!stale.length) return;
+        Promise.resolve().then(async () => {
+          for (const project of stale) {
+            try {
+              await deleteWorkspace(project.workspaceId);
+            } catch (reason) {
+              console.warn("[dsh-projects] could not drop a stale default-chat workspace", project.path, reason);
+            }
+          }
+        });
+      }, [workspaceState.phase]);
       const sessionsFor = (project) => {
         const list = (project.sessionIds || []).map((id) => sessionState.byId[id]).filter(visibleSession);
         if (prefs.orderBy === "manual") return list;

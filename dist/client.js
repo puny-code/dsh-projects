@@ -31,7 +31,7 @@ var require_default_workspace = __commonJS({
       if (!normalized || !normalizedRoot) return false;
       return normalized === normalizedRoot || normalized.startsWith(`${normalizedRoot}\\`) || normalized.startsWith(`${normalizedRoot}/`);
     }
-    function isPortableDefaultPath(path) {
+    function isPortableDefaultPath2(path) {
       return /[\\/]documents[\\/]dsh-default[\\/]\d{4}-\d{2}-\d{2}[\\/]new-chat(?:-\d+)?$/i.test(String(path || ""));
     }
     function safeGet(storage, key) {
@@ -103,7 +103,7 @@ var require_default_workspace = __commonJS({
         if (!workspace) return false;
         const legacyId = safeGet(storage, LEGACY_WORKSPACE_KEY);
         const storedRoot = safeGet(storage, DEFAULT_ROOT_KEY);
-        return Boolean(legacyId && workspace.workspaceId === legacyId) || isPathInside(workspace.path, storedRoot) || isPortableDefaultPath(workspace.path);
+        return Boolean(legacyId && workspace.workspaceId === legacyId) || isPathInside(workspace.path, storedRoot) || isPortableDefaultPath2(workspace.path);
       };
       const rememberRoot = (root) => {
         if (typeof root === "string" && root) safeSet(storage, DEFAULT_ROOT_KEY, root);
@@ -115,7 +115,7 @@ var require_default_workspace = __commonJS({
       LEGACY_WORKSPACE_KEY,
       createDefaultWorkspaceManager: createDefaultWorkspaceManager2,
       isPathInside,
-      isPortableDefaultPath,
+      isPortableDefaultPath: isPortableDefaultPath2,
       localDateSegment,
       nextSessionFolderName,
       normalizePath,
@@ -372,7 +372,7 @@ var DEFAULT_SHORTCUTS = {
   "session.fork": { keys: ["Ctrl", "Alt", "F"], aria: "Control+Alt+F" },
   "session.archive": { keys: ["Ctrl", "Shift", "A"], aria: "Control+Shift+A" }
 };
-var { createDefaultWorkspaceManager, unwrapDefaultWorkspaceResult } = require_default_workspace();
+var { createDefaultWorkspaceManager, isPortableDefaultPath, unwrapDefaultWorkspaceResult } = require_default_workspace();
 var { pickProjectDirectory } = require_directory_picker_strategy();
 var { initialProjectIndex, nextProjectIndex } = require_project_picker();
 var { parentDirectory } = require_picker_history();
@@ -2347,6 +2347,25 @@ function SidebarProjects({ wide, expandSidebar, useWorkspaces, useSessions, open
     setTimeout(() => setActionError(""), 5e3);
   };
   const run = (task) => Promise.resolve().then(task).catch(handleFailure);
+  const prunedStaleRef = React.useRef(false);
+  React.useEffect(() => {
+    if (prunedStaleRef.current || workspaceState.phase !== "ready") return;
+    const stale = (workspaceState.items || []).filter((project) => {
+      if (isDefaultWorkspace(project) || !isPortableDefaultPath(project.path)) return false;
+      return !(project.sessionIds || []).some((id) => visibleSession(sessionState.byId[id]));
+    });
+    prunedStaleRef.current = true;
+    if (!stale.length) return;
+    Promise.resolve().then(async () => {
+      for (const project of stale) {
+        try {
+          await deleteWorkspace(project.workspaceId);
+        } catch (reason) {
+          console.warn("[dsh-projects] could not drop a stale default-chat workspace", project.path, reason);
+        }
+      }
+    });
+  }, [workspaceState.phase]);
   const sessionsFor = (project) => {
     const list = (project.sessionIds || []).map((id) => sessionState.byId[id]).filter(visibleSession);
     if (prefs.orderBy === "manual") return list;

@@ -3,6 +3,7 @@
 - 「普通对话」回落到 DSH 自带的默认工作区 `~/Documents/deepseek-harness/default-workspace`，不再为每次聊天新建 `~/Documents/DSH-Default/<日期>/new-chat[-N]` 目录与工作区。走的是宿主公开的幂等接口 `workspaces.initializeDefault()`，已存在就直接复用，不建目录。
 - 去掉侧栏挂载时的自动开普通对话。之前每次界面重载（刷新、重开 DSH、启用/停用或更新插件）只要当时没打开会话，就会静默创建一整套「目录 + 工作区 + 空会话」，是侧栏里成排 `new-chat-NN` 工作区的来源。现在只在用户点「普通对话」时才会开始会话。
 - 默认工作区的标题按 DSH 的本地化规则显示为「默认工作区」，不再露出宿主内部的 `default-workspace` 段名。
+- 顺手清理旧版本留下的空壳：路径形如 `~/Documents/DSH-Default/<日期>/new-chat[-N]`、且没有任何有效会话的工作区注册，会在插件挂载时自动删掉（目录本身不动，里面真放了东西的保留）。
 
 ## 0.3.4-alpha.1 - 2026-10-21
 
