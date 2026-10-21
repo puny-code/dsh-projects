@@ -1,3 +1,8 @@
+## 0.3.4-alpha.1 - 2026-10-21
+
+- 内容搜索失败时不再只显示「暂时不可用」：按宿主返回的错误码分别提示「索引未开启 / 索引正在建立 / 会话正在更新」，并把原始报错放进悬停提示。
+- 索引暂不可用（SESSION_QUERY_PERSISTENCE_FAILED、SESSION_QUERY_INDEX_FAILED）时自动重试两次，每次间隔 1.5s，避免搜索进行中会话写入导致的瞬时失败。
+- 内容搜索不可用时，标题与项目名匹配照常展示。
 # Changelog
 
 All notable changes to this project will be documented here.
@@ -82,3 +87,4 @@ All notable changes to this project will be documented here.
 - Archive center with an explicit DSH unarchive compatibility limitation.
 - Light and dark theme support.
 - Cross-platform path-allocation unit tests and reproducible browser bundle.
+

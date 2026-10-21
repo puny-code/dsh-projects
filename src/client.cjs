@@ -23,7 +23,8 @@
 
     // Default keybindings of the shell actions these menu rows mirror; the live
     // shortcut catalog wins whenever the plugin can reach it.
-    const DEFAULT_SHORTCUTS = {
+    const RETRYABLE_SEARCH_ERRORS = new Set(["SESSION_QUERY_PERSISTENCE_FAILED", "SESSION_QUERY_INDEX_FAILED"]);
+const DEFAULT_SHORTCUTS = {
       "session.rename": { keys: ["Ctrl", "Alt", "G"], aria: "Control+Alt+G" },
       "session.fork": { keys: ["Ctrl", "Alt", "F"], aria: "Control+Alt+F" },
       "session.archive": { keys: ["Ctrl", "Shift", "A"], aria: "Control+Shift+A" }
@@ -123,6 +124,10 @@
         ,searchEverything: "搜索项目、聊天和聊天内容"
         ,searching: "正在搜索…"
         ,searchUnavailable: "聊天内容搜索暂时不可用"
+  ,searchDisabled: "内容搜索未开启：此部署的会话全文索引处于关闭状态。标题与项目名仍可搜索。"
+  ,searchIndexing: "内容索引正在建立，首次搜索需要一点时间，稍后会自动重试。"
+  ,searchBusy: "会话正在更新，索引这一轮没读完，稍后会自动重试。"
+  ,searchIndexingHint: "首次搜索需要先建立内容索引，可能要等一两分钟。"
         ,searchMore: "结果较多，请输入更精确的关键词"
         ,projectResult: "项目"
         ,chatResult: "聊天"
@@ -249,6 +254,10 @@
         ,searchEverything: "Search projects, chats, and chat content"
         ,searching: "Searching…"
         ,searchUnavailable: "Chat content search is temporarily unavailable"
+  ,searchDisabled: "Content search is off: this deployment disables the session full-text index. Titles and project names are still searchable."
+  ,searchIndexing: "The content index is still being built. The first search can take a moment; it will retry automatically."
+  ,searchBusy: "A chat is being written, so the index could not finish this pass. It will retry automatically."
+  ,searchIndexingHint: "The first content search has to build the index, which can take a minute or two."
         ,searchMore: "More results exist. Refine your search."
         ,projectResult: "Project"
         ,chatResult: "Chat"
@@ -1583,7 +1592,22 @@
       );
     }
 
-    function GlobalSearchResults({ query, projects, sessionState, archived, remote, limit, onOpenProject, onOpenSession, t }) {
+    function classifySearchFailure(message, code) {
+      const text = String(message || "");
+      if (code === "SESSION_QUERY_SEARCH_DISABLED" || /search is disabled|SESSION_QUERY_SEARCH_DISABLED/i.test(text)) return "SESSION_QUERY_SEARCH_DISABLED";
+      if (code === "SESSION_QUERY_PERSISTENCE_FAILED" || /did not stabilize|persistence observation|SESSION_QUERY_PERSISTENCE_FAILED/i.test(text)) return "SESSION_QUERY_PERSISTENCE_FAILED";
+      if (code === "SESSION_QUERY_INDEX_FAILED" || /SESSION_QUERY_INDEX_FAILED|index (?:open|build|reconcile) failed/i.test(text)) return "SESSION_QUERY_INDEX_FAILED";
+      return code || "";
+    }
+
+    function searchFailureText(remote, t) {
+      if (remote.code === "SESSION_QUERY_SEARCH_DISABLED") return t("searchDisabled");
+      if (remote.code === "SESSION_QUERY_PERSISTENCE_FAILED") return t("searchBusy");
+      if (remote.code === "SESSION_QUERY_INDEX_FAILED") return t("searchIndexing");
+      return t("searchUnavailable");
+    }
+
+    function GlobalSearchResults({ query, projects, sessionState, archived, remote, slow, limit, onOpenProject, onOpenSession, t }) {
       const needle = query.trim().toLowerCase();
       if (!needle) return h("div", { className: "dshp-search-status" }, t("searchEverything"));
       const projectBySession = new Map();
@@ -1644,7 +1668,8 @@
           ...recent.map(renderChat)
         ) : null,
         remote.status === "loading" ? h("div", { className: "dshp-search-status", role: "status" }, t("searching")) : null,
-        remote.status === "error" ? h("div", { className: "dshp-search-status", role: "status" }, t("searchUnavailable")) : null,
+        remote.status === "loading" && slow ? h("div", { className: "dshp-search-status" }, t("searchIndexingHint")) : null,
+        remote.status === "error" ? h("div", { className: "dshp-search-status", role: "status", title: remote.message || undefined }, searchFailureText(remote, t)) : null,
         remote.status !== "loading" && !groupedProjects.length && !recent.length ? h("div", { className: "dshp-search-status" }, t("noMatches")) : null,
         remote.hasMore || projectMatches.length > 8 || sessionMatches.length > limit ? h("div", { className: "dshp-search-status" }, t("searchMore")) : null
       );
@@ -1713,7 +1738,9 @@
       const [createOpen, setCreateOpen] = React.useState(false);
       const [searchOpen, setSearchOpen] = React.useState(false);
       const [searchQuery, setSearchQuery] = React.useState("");
-      const [searchRemote, setSearchRemote] = React.useState({ query: "", status: "idle", items: [], hasMore: false });
+      const [searchRemote, setSearchRemote] = React.useState({ query: "", status: "idle", items: [], hasMore: false, code: "", message: "" });
+      const [searchAttempt, setSearchAttempt] = React.useState(0);
+      const [searchSlow, setSearchSlow] = React.useState(false);
       const [archiveOpen, setArchiveOpen] = React.useState(false);
       const [drag, setDrag] = React.useState(null);
       const [dragOver, setDragOver] = React.useState(null);
@@ -1736,23 +1763,34 @@
         const timer = setTimeout(() => searchInputRef.current?.focus(), 20);
         return () => clearTimeout(timer);
       }, [searchOpen]);
+      React.useEffect(() => { setSearchAttempt(0); }, [searchOpen, searchQuery]);
+      React.useEffect(() => {
+        if (searchRemote.status !== "loading") { setSearchSlow(false); return; }
+        const timer = setTimeout(() => setSearchSlow(true), 4000);
+        return () => clearTimeout(timer);
+      }, [searchRemote.status]);
       React.useEffect(() => {
         const query = searchQuery.trim();
         if (!searchOpen || !query) {
-          setSearchRemote({ query, status: "idle", items: [], hasMore: false });
+          setSearchRemote({ query, status: "idle", items: [], hasMore: false, code: "", message: "" });
           return;
         }
         const controller = new AbortController();
+        let retryTimer = null;
         const timer = setTimeout(() => {
-          setSearchRemote({ query, status: "loading", items: [], hasMore: false });
+          setSearchRemote((previous) => ({ ...previous, query, status: "loading", code: "", message: "" }));
           Promise.resolve(searchSessions(query, controller.signal)).then((result) => {
-            if (!controller.signal.aborted) setSearchRemote({ query, status: "ready", items: result.items || [], hasMore: Boolean(result.hasMore) });
-          }).catch(() => {
-            if (!controller.signal.aborted) setSearchRemote({ query, status: "error", items: [], hasMore: false });
+            if (!controller.signal.aborted) setSearchRemote({ query, status: "ready", items: result.items || [], hasMore: Boolean(result.hasMore), code: "", message: "" });
+          }).catch((reason) => {
+            if (controller.signal.aborted) return;
+            const code = reason && reason.code ? String(reason.code) : "";
+            const message = reason instanceof Error ? reason.message : String(reason);
+            setSearchRemote({ query, status: "error", items: [], hasMore: false, code, message });
+            if (RETRYABLE_SEARCH_ERRORS.has(code) && searchAttempt < 2) retryTimer = setTimeout(() => setSearchAttempt(searchAttempt + 1), 1500);
           });
         }, 220);
-        return () => { clearTimeout(timer); controller.abort(); };
-      }, [searchOpen, searchQuery, searchSessions]);
+        return () => { clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer); controller.abort(); };
+      }, [searchOpen, searchQuery, searchSessions, searchAttempt]);
 
       const handleFailure = (reason) => {
         setActionError(format(t, "actionFailed", { message: reason instanceof Error ? reason.message : String(reason) }));
@@ -2009,7 +2047,7 @@
                 h("input", { ref: searchInputRef, value: searchQuery, placeholder: t("searchEverything"), "aria-label": t("globalSearch"), onChange: (event) => setSearchQuery(event.target.value), onKeyDown: (event) => { if (event.key === "Escape") closeSearch(); } }),
                 searchQuery ? h("button", { type: "button", className: "dshp-mini-button", title: t("cancel"), onClick: () => setSearchQuery("") }, h(Icon, { name: "close", size: 15 })) : null
               ),
-              h(GlobalSearchResults, { query: searchQuery, projects, sessionState, archived, remote: searchRemote.query === searchQuery.trim() ? searchRemote : { query: searchQuery.trim(), status: "loading", items: [], hasMore: false }, limit: searchResultLimit || 20, onOpenProject: openSearchProject, onOpenSession: openSearchSession, t })
+              h(GlobalSearchResults, { query: searchQuery, projects, sessionState, archived, remote: searchRemote.query === searchQuery.trim() ? searchRemote : { query: searchQuery.trim(), status: "loading", items: [], hasMore: false, code: "", message: "" }, slow: searchSlow, limit: searchResultLimit || 20, onOpenProject: openSearchProject, onOpenSession: openSearchSession, t })
             ) : prefs.groupBy === "flat"
               ? (flatSessions.length ? flatSessions.map((session) => renderSessionRow(session, projectForSession(session.id), true)) : h("div", { className: "dshp-sidebar-empty" }, t("noChats")))
               : (projects.length
@@ -2196,7 +2234,12 @@
         openPath: (path) => openPath(path),
         searchSessions: async (query, signal) => {
           const result = await ctx.sessions.search(query, signal);
-          if (!result.ok) throw new Error(result.error.message);
+          if (!result.ok) {
+            const failure = new Error((result.error && result.error.message) || "session search failed");
+            const code = classifySearchFailure(failure.message, result.error && result.error.code ? String(result.error.code) : "");
+            if (code) failure.code = code;
+            throw failure;
+          }
           return result.value;
         },
         searchResultLimit: ctx.sessions.searchResultLimit,
